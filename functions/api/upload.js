@@ -24,7 +24,7 @@ export async function onRequestPost(context) {
     const base64Image = btoa(binaryString);
 
     // Gemini APIの呼び出し
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${env.GEMINI_API_KEY}`;
     
     const prompt = `
       画像はレシートです。ユーザーからのコメント: "${comment}"
