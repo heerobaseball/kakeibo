@@ -5,18 +5,25 @@ export async function onRequestPost(context) {
   try {
     const formData = await request.formData();
     const image = formData.get('image');
-    const comment = formData.get('comment');
+    const comment = formData.get('comment') || ''; // コメントが空の場合の対策
 
-    if (!image) return new Response('画像が必要です', { status: 400 });
+    if (!image) return new Response(JSON.stringify({ error: '画像が必要です' }), { status: 400 });
 
-    // 画像をBase64に変換
+    // --- 修正箇所: 画像のBase64変換を安全に行う（Maximum call stack size exceeded対策） ---
     const arrayBuffer = await image.arrayBuffer();
-    const base64Image = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    const uint8Array = new Uint8Array(arrayBuffer);
+    let binaryString = '';
+    // スプレッド構文を使わず、ループで少しずつ処理する
+    for (let i = 0; i < uint8Array.byteLength; i++) {
+        binaryString += String.fromCharCode(uint8Array[i]);
+    }
+    const base64Image = btoa(binaryString);
+    // -------------------------------------------------------------------------
 
     // Gemini APIの呼び出し（v1betaを使用）
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`;
     
-    // Geminiへのプロンプト（ここで解析と負担額の計算を指示）
+    // Geminiへのプロンプト
     const prompt = `
       画像はレシートです。ユーザーからのコメント: "${comment}"
       このレシートの内容とコメントから、以下のJSONフォーマットでデータを出力してください。JSON以外のテキストは含めないでください。
@@ -44,6 +51,11 @@ export async function onRequestPost(context) {
 
     const geminiData = await geminiResponse.json();
     
+    // Gemini APIからエラーが返ってきた場合の対策を追加
+    if (!geminiData.candidates || geminiData.candidates.length === 0) {
+        throw new Error("Gemini APIでの解析に失敗しました。APIキーや画像を確認してください。");
+    }
+    
     // Geminiの返答からJSONを抽出（マークダウンブロックを削除）
     let resultText = geminiData.candidates[0].content.parts[0].text;
     resultText = resultText.replace(/```json\n|\n```/g, '');
@@ -65,6 +77,9 @@ export async function onRequestPost(context) {
     });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    return new Response(JSON.stringify({ error: error.message }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
