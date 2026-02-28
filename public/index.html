@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ふたりの家計簿</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 500px; margin: 0 auto; }
+        input, textarea, button { width: 100%; margin-bottom: 15px; padding: 10px; box-sizing: border-box; }
+        button { background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h2>レシート登録</h2>
+    <form id="uploadForm">
+        <label>レシート画像:</label>
+        <input type="file" id="imageInput" accept="image/*" capture="environment" required>
+        
+        <label>コメント (例: 妻がクレカで支払い。食費は折半、化粧品は妻負担):</label>
+        <textarea id="commentInput" rows="3" placeholder="支払った人や負担割合を入力してください"></textarea>
+        
+        <button type="submit">AIで解析して登録</button>
+    </form>
+    
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = "Geminiがレシートを解析中...";
+
+            const formData = new FormData();
+            formData.append('image', document.getElementById('imageInput').files[0]);
+            formData.append('comment', document.getElementById('commentInput').value);
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if(data.success) {
+                    resultDiv.innerHTML = `
+                        <p>✅ 登録完了!</p>
+                        <ul>
+                            <li>内容: ${data.data.description}</li>
+                            <li>合計: ${data.data.total_amount}円 (${data.data.payer}払い)</li>
+                            <li>夫の負担: ${data.data.husband_burden}円 / 妻の負担: ${data.data.wife_burden}円</li>
+                        </ul>
+                    `;
+                    document.getElementById('uploadForm').reset();
+                } else {
+                    resultDiv.textContent = "エラーが発生しました: " + data.error;
+                }
+            } catch (err) {
+                resultDiv.textContent = "通信エラーです。";
+            }
+        });
+    </script>
+</body>
+</html>
