@@ -1,29 +1,31 @@
 export async function onRequestPost(context) {
   const request = context.request;
-  const env = context.env; // D1やAPIキーにアクセス
+  const env = context.env; 
   
   try {
     const formData = await request.formData();
     const image = formData.get('image');
-    const comment = formData.get('comment') || ''; // コメントが空の場合の対策
+    const comment = formData.get('comment') || '';
 
     if (!image) return new Response(JSON.stringify({ error: '画像が必要です' }), { status: 400 });
 
-    // --- 修正箇所: 画像のBase64変換を安全に行う（Maximum call stack size exceeded対策） ---
+    // --- 追加: APIキーがCloudflareに正しく反映されているかチェック ---
+    if (!env.GEMINI_API_KEY) {
+        throw new Error("APIキーが見つかりません。Cloudflareの環境変数が正しく設定・反映（再デプロイ）されているか確認してください。");
+    }
+
+    // 画像のBase64変換
     const arrayBuffer = await image.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
     let binaryString = '';
-    // スプレッド構文を使わず、ループで少しずつ処理する
     for (let i = 0; i < uint8Array.byteLength; i++) {
         binaryString += String.fromCharCode(uint8Array[i]);
     }
     const base64Image = btoa(binaryString);
-    // -------------------------------------------------------------------------
 
-    // Gemini APIの呼び出し（v1betaを使用）
+    // Gemini APIの呼び出し
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`;
     
-    // Geminiへのプロンプト
     const prompt = `
       画像はレシートです。ユーザーからのコメント: "${comment}"
       このレシートの内容とコメントから、以下のJSONフォーマットでデータを出力してください。JSON以外のテキストは含めないでください。
@@ -51,15 +53,24 @@ export async function onRequestPost(context) {
 
     const geminiData = await geminiResponse.json();
     
-    // Gemini APIからエラーが返ってきた場合の対策を追加
-    if (!geminiData.candidates || geminiData.candidates.length === 0) {
-        throw new Error("Gemini APIでの解析に失敗しました。APIキーや画像を確認してください。");
+    // --- 修正: Googleからの「本当のエラーメッセージ」を画面に出す ---
+    if (!geminiResponse.ok) {
+        throw new Error(`Googleからのエラー: ${geminiData.error?.message || '詳細不明'}`);
     }
     
-    // Geminiの返答からJSONを抽出（マークダウンブロックを削除）
+    if (!geminiData.candidates || geminiData.candidates.length === 0) {
+        throw new Error("Geminiからの回答が空でした。");
+    }
+    
     let resultText = geminiData.candidates[0].content.parts[0].text;
     resultText = resultText.replace(/```json\n|\n```/g, '');
-    const parsedData = JSON.parse(resultText);
+    
+    let parsedData;
+    try {
+        parsedData = JSON.parse(resultText);
+    } catch (e) {
+         throw new Error("Geminiが指定通りのデータ(JSON)を返しませんでした。結果: " + resultText);
+    }
 
     // D1データベースへ保存
     await env.DB.prepare(
