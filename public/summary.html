@@ -5,96 +5,178 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>集計結果 - ふたりの家計簿</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; color: #333; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.9em; }
-        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+        body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; color: #333; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
         th { background-color: #f4f4f4; }
         .summary-box { background-color: #e9ecef; padding: 20px; border-radius: 8px; margin-top: 20px; line-height: 1.6; }
         .amount { font-size: 1.3em; font-weight: bold; color: #d9534f; }
-        a.button { display: inline-block; background-color: #6c757d; color: white; text-decoration: none; padding: 10px 15px; border-radius: 5px; margin-bottom: 20px; }
+        a.button, button.action-btn { background-color: #6c757d; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; text-decoration: none; }
+        button.settle-btn { background-color: #28a745; margin-bottom: 10px; }
+        .settled-row { background-color: #f8f9fa; color: #aaa; } /* 精算済みの行を少し薄くする */
+        dialog { padding: 20px; border-radius: 8px; border: 1px solid #ccc; width: 90%; max-width: 400px; }
+        dialog input, dialog select { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
     </style>
 </head>
 <body>
     <a href="/" class="button">← レシート登録に戻る</a>
-    <h2>💸 今月の精算（立替）状況</h2>
+    <h2>💸 今月の精算（未精算分の立替）</h2>
     
     <div id="summaryBox" class="summary-box">データを計算中...</div>
 
     <h2>📜 履歴一覧</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>日付</th>
-                <th>内容</th>
-                <th>支払った人</th>
-                <th>合計金額</th>
-                <th>夫の負担</th>
-                <th>妻の負担</th>
-            </tr>
-        </thead>
-        <tbody id="expenseList">
-            <tr><td colspan="6">読み込み中...</td></tr>
-        </tbody>
-    </table>
+    <button class="action-btn settle-btn" onclick="settleSelected()">☑ 選択した項目を「精算済み」にする</button>
+    
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>精算</th>
+                    <th>日付</th>
+                    <th>内容</th>
+                    <th>支払</th>
+                    <th>合計</th>
+                    <th>夫負担</th>
+                    <th>妻負担</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="expenseList">
+                <tr><td colspan="8">読み込み中...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <dialog id="editModal">
+        <h3>内容の編集</h3>
+        <input type="hidden" id="editId">
+        <label>内容:</label><input type="text" id="editDesc">
+        <label>支払った人:</label>
+        <select id="editPayer"><option value="夫">夫</option><option value="妻">妻</option></select>
+        <label>合計金額:</label><input type="number" id="editTotal">
+        <label>夫の負担:</label><input type="number" id="editHusband">
+        <label>妻の負担:</label><input type="number" id="editWife">
+        <div style="text-align: right; margin-top: 10px;">
+            <button class="action-btn" onclick="document.getElementById('editModal').close()" style="background:#ccc;">キャンセル</button>
+            <button class="action-btn" onclick="saveEdit()" style="background:#007bff;">保存</button>
+        </div>
+    </dialog>
 
     <script>
         async function loadData() {
-            try {
-                const res = await fetch('/api/summary');
-                const data = await res.json();
+            const res = await fetch('/api/summary');
+            const data = await res.json();
+            const tbody = document.getElementById('expenseList');
+            tbody.innerHTML = '';
 
-                const tbody = document.getElementById('expenseList');
-                tbody.innerHTML = '';
+            let husbandPaidTotal = 0, wifePaidTotal = 0;
+            let husbandBurdenTotal = 0, wifeBurdenTotal = 0;
 
-                let husbandPaidTotal = 0;
-                let wifePaidTotal = 0;
-                let husbandBurdenTotal = 0;
-                let wifeBurdenTotal = 0;
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                if (row.is_settled === 1) tr.classList.add('settled-row'); // 精算済みは色を薄く
+                
+                const dateStr = new Date(row.date).toLocaleDateString('ja-JP');
+                
+                // 精算済みならチェックボックスを出さない
+                const checkboxHtml = row.is_settled === 1 ? '済' : `<input type="checkbox" class="settle-check" value="${row.id}">`;
 
-                // 履歴をテーブルに追加しながら金額を集計
-                data.forEach(row => {
-                    const tr = document.createElement('tr');
-                    const dateStr = new Date(row.date).toLocaleDateString('ja-JP');
-                    tr.innerHTML = `
-                        <td>${dateStr}</td>
-                        <td>${row.description}</td>
-                        <td>${row.payer}</td>
-                        <td>${row.total_amount}円</td>
-                        <td>${row.husband_burden}円</td>
-                        <td>${row.wife_burden}円</td>
-                    `;
-                    tbody.appendChild(tr);
+                tr.innerHTML = `
+                    <td style="text-align:center;">${checkboxHtml}</td>
+                    <td>${dateStr}</td>
+                    <td>${row.description}</td>
+                    <td>${row.payer}</td>
+                    <td>${row.total_amount}</td>
+                    <td>${row.husband_burden}</td>
+                    <td>${row.wife_burden}</td>
+                    <td>
+                        <button class="action-btn" style="padding:4px; font-size:0.8em;" onclick='openEdit(${JSON.stringify(row)})'>編集</button>
+                        <button class="action-btn" style="padding:4px; font-size:0.8em; background:#d9534f;" onclick="deleteRecord(${row.id})">削除</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
 
+                // 未精算(0)のものだけを集計に含める
+                if (row.is_settled === 0) {
                     if (row.payer === '夫') husbandPaidTotal += row.total_amount;
                     if (row.payer === '妻') wifePaidTotal += row.total_amount;
                     husbandBurdenTotal += row.husband_burden;
                     wifeBurdenTotal += row.wife_burden;
-                });
-
-                // 誰がいくら多めに払っているか（立替残高）を計算
-                const husbandBalance = husbandPaidTotal - husbandBurdenTotal;
-                const wifeBalance = wifePaidTotal - wifeBurdenTotal;
-
-                let settlementText = "";
-                if (husbandBalance > 0) {
-                    settlementText = `現在、<strong>妻</strong> から <strong>夫</strong> へ <span class="amount">${husbandBalance}円</span> 支払うと精算完了です。`;
-                } else if (wifeBalance > 0) {
-                    settlementText = `現在、<strong>夫</strong> から <strong>妻</strong> へ <span class="amount">${wifeBalance}円</span> 支払うと精算完了です。`;
-                } else {
-                    settlementText = "現在、精算の必要はありません（負担はピッタリです）。";
                 }
+            });
 
-                document.getElementById('summaryBox').innerHTML = `
-                    <p>・夫が立て替えている額（未精算）: ${husbandBalance}円</p>
-                    <p>・妻が立て替えている額（未精算）: ${wifeBalance}円</p>
-                    <hr style="border:0; border-top:1px dashed #ccc; margin: 15px 0;">
-                    <p>${settlementText}</p>
-                `;
+            const husbandBalance = husbandPaidTotal - husbandBurdenTotal;
+            const wifeBalance = wifePaidTotal - wifeBurdenTotal;
+            let settlementText = "現在、精算の必要はありません（負担はピッタリです）。";
+            if (husbandBalance > 0) settlementText = `現在、<strong>妻</strong> から <strong>夫</strong> へ <span class="amount">${husbandBalance}円</span> 支払うと精算完了です。`;
+            if (wifeBalance > 0) settlementText = `現在、<strong>夫</strong> から <strong>妻</strong> へ <span class="amount">${wifeBalance}円</span> 支払うと精算完了です。`;
 
-            } catch (error) {
-                document.getElementById('summaryBox').textContent = "データの読み込みに失敗しました。";
-            }
+            document.getElementById('summaryBox').innerHTML = `
+                <p>・夫が立て替えている額（未精算）: ${husbandBalance}円</p>
+                <p>・妻が立て替えている額（未精算）: ${wifeBalance}円</p>
+                <hr style="border:0; border-top:1px dashed #ccc; margin: 15px 0;">
+                <p>${settlementText}</p>
+            `;
         }
+
+        // --- 削除機能 ---
+        async function deleteRecord(id) {
+            if(!confirm("本当に削除しますか？")) return;
+            await fetch('/api/manage', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ action: 'delete', id: id })
+            });
+            loadData(); // 画面をリロード
+        }
+
+        // --- 編集機能（モーダルを開く） ---
+        function openEdit(row) {
+            document.getElementById('editId').value = row.id;
+            document.getElementById('editDesc').value = row.description;
+            document.getElementById('editPayer').value = row.payer;
+            document.getElementById('editTotal').value = row.total_amount;
+            document.getElementById('editHusband').value = row.husband_burden;
+            document.getElementById('editWife').value = row.wife_burden;
+            document.getElementById('editModal').showModal();
+        }
+
+        // --- 編集の保存 ---
+        async function saveEdit() {
+            const data = {
+                action: 'update',
+                id: document.getElementById('editId').value,
+                description: document.getElementById('editDesc').value,
+                payer: document.getElementById('editPayer').value,
+                total_amount: Number(document.getElementById('editTotal').value),
+                husband_burden: Number(document.getElementById('editHusband').value),
+                wife_burden: Number(document.getElementById('editWife').value)
+            };
+            await fetch('/api/manage', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            document.getElementById('editModal').close();
+            loadData();
+        }
+
+        // --- 精算機能 ---
+        async function settleSelected() {
+            const checkboxes = document.querySelectorAll('.settle-check:checked');
+            const ids = Array.from(checkboxes).map(cb => Number(cb.value));
+            if(ids.length === 0) {
+                alert("精算済みにする項目にチェックを入れてください。");
+                return;
+            }
+            if(!confirm("選択した項目を「精算済み」にします。よろしいですか？\n(精算済みにすると、上の立替額の計算から除外されます)")) return;
+
+            await fetch('/api/manage', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ action: 'settle', ids: ids })
+            });
+            loadData();
+        }
+
+        // 最初の一回読み込み
         loadData();
     </script>
 </body>
