@@ -41,52 +41,40 @@
 
     <form id="textForm" class="tab-content">
         <label>支出の内容を自由に入力してください:</label>
-        <textarea id="textInput" rows="4" placeholder="例: スーパーで食料品を3000円夫が支払い。全額夫負担。"></textarea>
+        <textarea id="textInput" rows="4" placeholder="例: 昨日、スーパーで食料品を3000円夫が支払い。全額夫負担。"></textarea>
         <button type="submit">AIで文字解析して登録</button>
     </form>
     
     <div id="result" style="margin-top: 15px; font-weight: bold;"></div>
 
     <script>
-        // タブ切り替え処理
         document.getElementById('tabImage').addEventListener('click', () => {
-            document.getElementById('tabImage').classList.add('active');
-            document.getElementById('tabText').classList.remove('active');
-            document.getElementById('uploadForm').classList.add('active');
-            document.getElementById('textForm').classList.remove('active');
+            document.getElementById('tabImage').classList.add('active'); document.getElementById('tabText').classList.remove('active');
+            document.getElementById('uploadForm').classList.add('active'); document.getElementById('textForm').classList.remove('active');
         });
         document.getElementById('tabText').addEventListener('click', () => {
-            document.getElementById('tabText').classList.add('active');
-            document.getElementById('tabImage').classList.remove('active');
-            document.getElementById('textForm').classList.add('active');
-            document.getElementById('uploadForm').classList.remove('active');
+            document.getElementById('tabText').classList.add('active'); document.getElementById('tabImage').classList.remove('active');
+            document.getElementById('textForm').classList.add('active'); document.getElementById('uploadForm').classList.remove('active');
         });
 
-        const dropZone = document.getElementById('dropZone');
-        const imageInput = document.getElementById('imageInput');
-        const fileNameDisplay = document.getElementById('fileName');
-
+        const dropZone = document.getElementById('dropZone'); const imageInput = document.getElementById('imageInput'); const fileNameDisplay = document.getElementById('fileName');
         dropZone.addEventListener('click', () => imageInput.click());
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault(); dropZone.classList.remove('dragover');
-            if (e.dataTransfer.files.length > 0) {
-                imageInput.files = e.dataTransfer.files;
-                fileNameDisplay.textContent = `選択中: ${e.dataTransfer.files[0].name}`;
-            }
-        });
-        imageInput.addEventListener('change', () => {
-            if (imageInput.files.length > 0) fileNameDisplay.textContent = `選択中: ${imageInput.files[0].name}`;
-        });
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files.length > 0) { imageInput.files = e.dataTransfer.files; fileNameDisplay.textContent = `選択中: ${e.dataTransfer.files[0].name}`; } });
+        imageInput.addEventListener('change', () => { if (imageInput.files.length > 0) fileNameDisplay.textContent = `選択中: ${imageInput.files[0].name}`; });
 
-        // AIへの共通プロンプト（ジャンルと支払者の厳密な指定を追加）
-        const basePrompt = `以下の情報を解析し、指定されたJSONフォーマットで出力してください。JSON以外のテキストは絶対に含めないでください。
+        // 今日の日付を取得してAIに教える（基準日として使うため）
+        const todayStr = new Date().toLocaleDateString('ja-JP');
+
+        const basePrompt = `本日は ${todayStr} です。以下の情報を解析し、指定されたJSONフォーマットで出力してください。JSON以外のテキストは絶対に含めないでください。
 ルール:
-1. "payer" (支払った人) は必ず "夫" または "妻" のいずれかに統一してください。（私、自分などの表現は文脈から推測して変換してください）
-2. "genre" (ジャンル) は以下の4つの中から最も適したものを選んでください: ["食料品、日用品", "外食費", "旅費", "その他"]
+1. "date" は、レシートに印字されている日付、または入力内容から推測される決済日を "YYYY-MM-DD" 形式で出力してください。年が省略されている場合は今年とし、全く推測できない場合は本日の日付にしてください。
+2. "payer" (支払った人) は必ず "夫" または "妻" のいずれかに統一してください。
+3. "genre" (ジャンル) は以下の4つの中から最も適したものを選んでください: ["食料品、日用品", "外食費", "旅費", "その他"]
 フォーマット:
 {
+  "date": "YYYY-MM-DD",
   "description": "購入した主な品目や店舗名",
   "total_amount": 合計金額(数値),
   "payer": "夫 または 妻",
@@ -95,77 +83,47 @@
   "genre": "選んだジャンル"
 }`;
 
-        // 共通の送信処理関数
         async function processAI(contentsArray, resultDiv, formElement) {
             try {
                 resultDiv.textContent = "AI解析の準備中...";
-                const configRes = await fetch('/api/config');
-                const configData = await configRes.json();
+                const configRes = await fetch('/api/config'); const configData = await configRes.json();
                 if (!configData.apiKey) throw new Error("APIキーが取得できません。");
 
                 resultDiv.textContent = "Geminiが解析中...";
                 const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${configData.apiKey}`;
                 
-                const geminiRes = await fetch(geminiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: contentsArray }] })
-                });
-                
+                const geminiRes = await fetch(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: contentsArray }] }) });
                 const geminiData = await geminiRes.json();
                 if (!geminiRes.ok) throw new Error(`Googleエラー: ${geminiData.error?.message || '詳細不明'}`);
                 
-                let resultText = geminiData.candidates[0].content.parts[0].text;
-                resultText = resultText.replace(/```json\n|\n```/g, '');
+                let resultText = geminiData.candidates[0].content.parts[0].text.replace(/```json\n|\n```/g, '');
                 const parsedData = JSON.parse(resultText);
 
                 resultDiv.textContent = "データをデータベースに保存中...";
-
-                const saveRes = await fetch('/api/upload', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(parsedData)
-                });
-                
+                const saveRes = await fetch('/api/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(parsedData) });
                 const saveData = await saveRes.json();
+                
                 if(saveData.success) {
-                    resultDiv.innerHTML = `<p style="color:green;">✅ 登録完了!</p>内容: [${saveData.data.genre}] ${saveData.data.description} / 合計: ${saveData.data.total_amount}円`;
-                    formElement.reset();
-                    if(fileNameDisplay) fileNameDisplay.textContent = "";
-                } else {
-                    throw new Error(saveData.error);
-                }
-            } catch (err) {
-                resultDiv.textContent = "エラーが発生しました: " + err.message;
-            }
+                    resultDiv.innerHTML = `<p style="color:green;">✅ 登録完了!</p>決済日: ${saveData.data.date} / 内容: [${saveData.data.genre}] ${saveData.data.description} / 合計: ${saveData.data.total_amount}円`;
+                    formElement.reset(); if(fileNameDisplay) fileNameDisplay.textContent = "";
+                } else { throw new Error(saveData.error); }
+            } catch (err) { resultDiv.textContent = "エラーが発生しました: " + err.message; }
         }
 
-        // 画像フォームの送信
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const file = imageInput.files[0];
-            if (!file) { alert("画像を選択してください"); return; }
-            const comment = document.getElementById('commentInputImage').value;
-            const prompt = basePrompt + `\n\n【ユーザーコメント】: "${comment}"\n【画像】: 添付のレシート`;
-            
+            e.preventDefault(); const file = imageInput.files[0]; if (!file) { alert("画像を選択してください"); return; }
+            const prompt = basePrompt + `\n\n【ユーザーコメント】: "${document.getElementById('commentInputImage').value}"\n【画像】: 添付のレシート`;
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const base64Image = e.target.result.split(',')[1];
-                const parts = [{ text: prompt }, { inline_data: { mime_type: file.type, data: base64Image } }];
-                await processAI(parts, document.getElementById('result'), document.getElementById('uploadForm'));
+                await processAI([{ text: prompt }, { inline_data: { mime_type: file.type, data: base64Image } }], document.getElementById('result'), document.getElementById('uploadForm'));
             };
             reader.readAsDataURL(file);
         });
 
-        // テキストフォームの送信
         document.getElementById('textForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const text = document.getElementById('textInput').value;
-            if (!text) { alert("支出の内容を入力してください"); return; }
-            const prompt = basePrompt + `\n\n【入力内容】: "${text}"`;
-            
-            const parts = [{ text: prompt }];
-            await processAI(parts, document.getElementById('result'), document.getElementById('textForm'));
+            e.preventDefault(); const text = document.getElementById('textInput').value; if (!text) { alert("支出の内容を入力してください"); return; }
+            await processAI([{ text: basePrompt + `\n\n【入力内容】: "${text}"` }], document.getElementById('result'), document.getElementById('textForm'));
         });
     </script>
 </body>

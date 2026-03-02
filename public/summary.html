@@ -52,6 +52,7 @@
     <dialog id="editModal">
         <h3>内容の編集</h3>
         <input type="hidden" id="editId">
+        <label>決済日:</label><input type="date" id="editDate">
         <label>ジャンル:</label>
         <select id="editGenre">
             <option value="食料品、日用品">食料品、日用品</option>
@@ -78,14 +79,17 @@
             const tbody = document.getElementById('expenseList');
             tbody.innerHTML = '';
 
-            let husbandBalance = 0; // 夫の立替残高
-            let wifeBalance = 0;    // 妻の立替残高
+            let husbandBalance = 0;
+            let wifeBalance = 0;
 
             data.forEach(row => {
                 const tr = document.createElement('tr');
                 if (row.is_settled === 1) tr.classList.add('settled-row');
                 
-                const dateStr = new Date(row.date).toLocaleDateString('ja-JP');
+                // YYYY-MM-DDなどを日本の見やすい形式に
+                const dateObj = new Date(row.date);
+                const dateStr = isNaN(dateObj) ? row.date : dateObj.toLocaleDateString('ja-JP');
+                
                 const checkboxHtml = row.is_settled === 1 ? '済' : `<input type="checkbox" class="settle-check" value="${row.id}">`;
                 const genreText = row.genre || 'その他';
 
@@ -105,25 +109,22 @@
                 `;
                 tbody.appendChild(tr);
 
-                // 未精算(0)のものだけを集計
                 if (row.is_settled === 0) {
                     const total = Number(row.total_amount) || 0;
                     const hBurden = Number(row.husband_burden) || 0;
                     const wBurden = Number(row.wife_burden) || 0;
                     const payer = String(row.payer).trim();
 
-                    // 立替額 = 自分が払った額(total) - 自分が本来負担する額(burden)
                     if (payer === '夫') {
                         husbandBalance += (total - hBurden);
-                        wifeBalance -= wBurden; // 妻は負担分だけマイナスになる
+                        wifeBalance -= wBurden;
                     } else if (payer === '妻') {
                         wifeBalance += (total - wBurden);
-                        husbandBalance -= hBurden; // 夫は負担分だけマイナスになる
+                        husbandBalance -= hBurden;
                     }
                 }
             });
 
-            // 残高の調整（どちらかがプラスなら、もう一方はマイナスになる）
             const finalHusbandReceive = husbandBalance > 0 ? husbandBalance : 0;
             const finalWifeReceive = wifeBalance > 0 ? wifeBalance : 0;
 
@@ -147,6 +148,15 @@
 
         function openEdit(row) {
             document.getElementById('editId').value = row.id;
+            
+            // 日付を YYYY-MM-DD 形式に直してカレンダーにセットする
+            let editDateStr = "";
+            if (row.date) {
+                // データベースに入っている形式(例: 2024-05-20T12:00:00Z)から先頭10文字を切り取る
+                editDateStr = String(row.date).substring(0, 10);
+            }
+            document.getElementById('editDate').value = editDateStr;
+            
             document.getElementById('editGenre').value = row.genre || 'その他';
             document.getElementById('editDesc').value = row.description;
             document.getElementById('editPayer').value = row.payer;
@@ -160,6 +170,7 @@
             const data = {
                 action: 'update',
                 id: document.getElementById('editId').value,
+                date: document.getElementById('editDate').value,
                 genre: document.getElementById('editGenre').value,
                 description: document.getElementById('editDesc').value,
                 payer: document.getElementById('editPayer').value,

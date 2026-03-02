@@ -7,9 +7,10 @@ export async function onRequestPost(context) {
       await env.DB.prepare("DELETE FROM expenses WHERE id = ?").bind(data.id).run();
     } 
     else if (data.action === 'update') {
+      // date（決済日）も含めて更新する
       await env.DB.prepare(
-        "UPDATE expenses SET description = ?, total_amount = ?, payer = ?, husband_burden = ?, wife_burden = ?, genre = ? WHERE id = ?"
-      ).bind(data.description, data.total_amount, data.payer, data.husband_burden, data.wife_burden, data.genre, data.id).run();
+        "UPDATE expenses SET date = ?, description = ?, total_amount = ?, payer = ?, husband_burden = ?, wife_burden = ?, genre = ? WHERE id = ?"
+      ).bind(data.date, data.description, data.total_amount, data.payer, data.husband_burden, data.wife_burden, data.genre, data.id).run();
     } 
     else if (data.action === 'settle') {
       const ids = data.ids;
