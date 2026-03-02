@@ -3,14 +3,13 @@ export async function onRequestPost(context) {
   try {
     const data = await context.request.json();
     
-    // アクション（delete, update, settle）によって処理を分岐
     if (data.action === 'delete') {
       await env.DB.prepare("DELETE FROM expenses WHERE id = ?").bind(data.id).run();
     } 
     else if (data.action === 'update') {
       await env.DB.prepare(
-        "UPDATE expenses SET description = ?, total_amount = ?, payer = ?, husband_burden = ?, wife_burden = ? WHERE id = ?"
-      ).bind(data.description, data.total_amount, data.payer, data.husband_burden, data.wife_burden, data.id).run();
+        "UPDATE expenses SET description = ?, total_amount = ?, payer = ?, husband_burden = ?, wife_burden = ?, genre = ? WHERE id = ?"
+      ).bind(data.description, data.total_amount, data.payer, data.husband_burden, data.wife_burden, data.genre, data.id).run();
     } 
     else if (data.action === 'settle') {
       const ids = data.ids;

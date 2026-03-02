@@ -5,17 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>集計結果 - ふたりの家計簿</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; color: #333; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }
+        body { font-family: sans-serif; padding: 20px; max-width: 900px; margin: 0 auto; color: #333; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85em; }
         th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
         th { background-color: #f4f4f4; }
         .summary-box { background-color: #e9ecef; padding: 20px; border-radius: 8px; margin-top: 20px; line-height: 1.6; }
         .amount { font-size: 1.3em; font-weight: bold; color: #d9534f; }
-        a.button, button.action-btn { background-color: #6c757d; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; text-decoration: none; }
-        button.settle-btn { background-color: #28a745; margin-bottom: 10px; }
-        .settled-row { background-color: #f8f9fa; color: #aaa; } /* 精算済みの行を少し薄くする */
+        a.button, button.action-btn { background-color: #6c757d; color: white; border: none; padding: 6px 10px; border-radius: 5px; cursor: pointer; text-decoration: none; }
+        button.settle-btn { background-color: #28a745; margin-bottom: 10px; padding: 10px;}
+        .settled-row { background-color: #f8f9fa; color: #aaa; }
         dialog { padding: 20px; border-radius: 8px; border: 1px solid #ccc; width: 90%; max-width: 400px; }
         dialog input, dialog select { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
+        .genre-badge { display: inline-block; padding: 3px 6px; background-color: #17a2b8; color: white; border-radius: 4px; font-size: 0.8em;}
     </style>
 </head>
 <body>
@@ -33,6 +34,7 @@
                 <tr>
                     <th>精算</th>
                     <th>日付</th>
+                    <th>ジャンル</th>
                     <th>内容</th>
                     <th>支払</th>
                     <th>合計</th>
@@ -42,7 +44,7 @@
                 </tr>
             </thead>
             <tbody id="expenseList">
-                <tr><td colspan="8">読み込み中...</td></tr>
+                <tr><td colspan="9">読み込み中...</td></tr>
             </tbody>
         </table>
     </div>
@@ -50,6 +52,13 @@
     <dialog id="editModal">
         <h3>内容の編集</h3>
         <input type="hidden" id="editId">
+        <label>ジャンル:</label>
+        <select id="editGenre">
+            <option value="食料品、日用品">食料品、日用品</option>
+            <option value="外食費">外食費</option>
+            <option value="旅費">旅費</option>
+            <option value="その他">その他</option>
+        </select>
         <label>内容:</label><input type="text" id="editDesc">
         <label>支払った人:</label>
         <select id="editPayer"><option value="夫">夫</option><option value="妻">妻</option></select>
@@ -69,21 +78,21 @@
             const tbody = document.getElementById('expenseList');
             tbody.innerHTML = '';
 
-            let husbandPaidTotal = 0, wifePaidTotal = 0;
-            let husbandBurdenTotal = 0, wifeBurdenTotal = 0;
+            let husbandBalance = 0; // 夫の立替残高
+            let wifeBalance = 0;    // 妻の立替残高
 
             data.forEach(row => {
                 const tr = document.createElement('tr');
-                if (row.is_settled === 1) tr.classList.add('settled-row'); // 精算済みは色を薄く
+                if (row.is_settled === 1) tr.classList.add('settled-row');
                 
                 const dateStr = new Date(row.date).toLocaleDateString('ja-JP');
-                
-                // 精算済みならチェックボックスを出さない
                 const checkboxHtml = row.is_settled === 1 ? '済' : `<input type="checkbox" class="settle-check" value="${row.id}">`;
+                const genreText = row.genre || 'その他';
 
                 tr.innerHTML = `
                     <td style="text-align:center;">${checkboxHtml}</td>
                     <td>${dateStr}</td>
+                    <td><span class="genre-badge">${genreText}</span></td>
                     <td>${row.description}</td>
                     <td>${row.payer}</td>
                     <td>${row.total_amount}</td>
@@ -96,42 +105,49 @@
                 `;
                 tbody.appendChild(tr);
 
-                // 未精算(0)のものだけを集計に含める
+                // 未精算(0)のものだけを集計
                 if (row.is_settled === 0) {
-                    if (row.payer === '夫') husbandPaidTotal += row.total_amount;
-                    if (row.payer === '妻') wifePaidTotal += row.total_amount;
-                    husbandBurdenTotal += row.husband_burden;
-                    wifeBurdenTotal += row.wife_burden;
+                    const total = Number(row.total_amount) || 0;
+                    const hBurden = Number(row.husband_burden) || 0;
+                    const wBurden = Number(row.wife_burden) || 0;
+                    const payer = String(row.payer).trim();
+
+                    // 立替額 = 自分が払った額(total) - 自分が本来負担する額(burden)
+                    if (payer === '夫') {
+                        husbandBalance += (total - hBurden);
+                        wifeBalance -= wBurden; // 妻は負担分だけマイナスになる
+                    } else if (payer === '妻') {
+                        wifeBalance += (total - wBurden);
+                        husbandBalance -= hBurden; // 夫は負担分だけマイナスになる
+                    }
                 }
             });
 
-            const husbandBalance = husbandPaidTotal - husbandBurdenTotal;
-            const wifeBalance = wifePaidTotal - wifeBurdenTotal;
+            // 残高の調整（どちらかがプラスなら、もう一方はマイナスになる）
+            const finalHusbandReceive = husbandBalance > 0 ? husbandBalance : 0;
+            const finalWifeReceive = wifeBalance > 0 ? wifeBalance : 0;
+
             let settlementText = "現在、精算の必要はありません（負担はピッタリです）。";
-            if (husbandBalance > 0) settlementText = `現在、<strong>妻</strong> から <strong>夫</strong> へ <span class="amount">${husbandBalance}円</span> 支払うと精算完了です。`;
-            if (wifeBalance > 0) settlementText = `現在、<strong>夫</strong> から <strong>妻</strong> へ <span class="amount">${wifeBalance}円</span> 支払うと精算完了です。`;
+            if (finalHusbandReceive > 0) settlementText = `現在、<strong>妻</strong> から <strong>夫</strong> へ <span class="amount">${finalHusbandReceive}円</span> 支払うと精算完了です。`;
+            if (finalWifeReceive > 0) settlementText = `現在、<strong>夫</strong> から <strong>妻</strong> へ <span class="amount">${finalWifeReceive}円</span> 支払うと精算完了です。`;
 
             document.getElementById('summaryBox').innerHTML = `
-                <p>・夫が立て替えている額（未精算）: ${husbandBalance}円</p>
-                <p>・妻が立て替えている額（未精算）: ${wifeBalance}円</p>
+                <p>・夫が立て替えている額（未精算）: ${finalHusbandReceive}円</p>
+                <p>・妻が立て替えている額（未精算）: ${finalWifeReceive}円</p>
                 <hr style="border:0; border-top:1px dashed #ccc; margin: 15px 0;">
                 <p>${settlementText}</p>
             `;
         }
 
-        // --- 削除機能 ---
         async function deleteRecord(id) {
             if(!confirm("本当に削除しますか？")) return;
-            await fetch('/api/manage', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ action: 'delete', id: id })
-            });
-            loadData(); // 画面をリロード
+            await fetch('/api/manage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'delete', id: id }) });
+            loadData();
         }
 
-        // --- 編集機能（モーダルを開く） ---
         function openEdit(row) {
             document.getElementById('editId').value = row.id;
+            document.getElementById('editGenre').value = row.genre || 'その他';
             document.getElementById('editDesc').value = row.description;
             document.getElementById('editPayer').value = row.payer;
             document.getElementById('editTotal').value = row.total_amount;
@@ -140,43 +156,31 @@
             document.getElementById('editModal').showModal();
         }
 
-        // --- 編集の保存 ---
         async function saveEdit() {
             const data = {
                 action: 'update',
                 id: document.getElementById('editId').value,
+                genre: document.getElementById('editGenre').value,
                 description: document.getElementById('editDesc').value,
                 payer: document.getElementById('editPayer').value,
                 total_amount: Number(document.getElementById('editTotal').value),
                 husband_burden: Number(document.getElementById('editHusband').value),
                 wife_burden: Number(document.getElementById('editWife').value)
             };
-            await fetch('/api/manage', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            });
+            await fetch('/api/manage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
             document.getElementById('editModal').close();
             loadData();
         }
 
-        // --- 精算機能 ---
         async function settleSelected() {
             const checkboxes = document.querySelectorAll('.settle-check:checked');
             const ids = Array.from(checkboxes).map(cb => Number(cb.value));
-            if(ids.length === 0) {
-                alert("精算済みにする項目にチェックを入れてください。");
-                return;
-            }
-            if(!confirm("選択した項目を「精算済み」にします。よろしいですか？\n(精算済みにすると、上の立替額の計算から除外されます)")) return;
-
-            await fetch('/api/manage', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ action: 'settle', ids: ids })
-            });
+            if(ids.length === 0) { alert("精算済みにする項目にチェックを入れてください。"); return; }
+            if(!confirm("選択した項目を「精算済み」にします。よろしいですか？")) return;
+            await fetch('/api/manage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'settle', ids: ids }) });
             loadData();
         }
 
-        // 最初の一回読み込み
         loadData();
     </script>
 </body>
