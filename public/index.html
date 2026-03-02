@@ -75,7 +75,7 @@
 
                         // 3. 日本の回線から直接Google AIへ通信！
                         const prompt = `画像はレシートです。ユーザーからのコメント: "${comment}"\nこのレシートの内容とコメントから、以下のJSONフォーマットでデータを出力してください。JSON以外のテキストは含めないでください。\n{\n  "description": "購入した主な品目や店舗名",\n  "total_amount": 合計金額(数値),\n  "payer": "支払った人(夫 or 妻)",\n  "husband_burden": 夫の負担額(数値),\n  "wife_burden": 妻の負担額(数値)\n}`;
-                        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash:generateContent?key=${configData.apiKey}`;                 
+                        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${configData.apiKey}`;
                         const geminiRes = await fetch(geminiUrl, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
