@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>集計結果 - ふたりの家計簿</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; color: #333; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.9em; }
+        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+        th { background-color: #f4f4f4; }
+        .summary-box { background-color: #e9ecef; padding: 20px; border-radius: 8px; margin-top: 20px; line-height: 1.6; }
+        .amount { font-size: 1.3em; font-weight: bold; color: #d9534f; }
+        a.button { display: inline-block; background-color: #6c757d; color: white; text-decoration: none; padding: 10px 15px; border-radius: 5px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <a href="/" class="button">← レシート登録に戻る</a>
+    <h2>💸 今月の精算（立替）状況</h2>
+    
+    <div id="summaryBox" class="summary-box">データを計算中...</div>
+
+    <h2>📜 履歴一覧</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>日付</th>
+                <th>内容</th>
+                <th>支払った人</th>
+                <th>合計金額</th>
+                <th>夫の負担</th>
+                <th>妻の負担</th>
+            </tr>
+        </thead>
+        <tbody id="expenseList">
+            <tr><td colspan="6">読み込み中...</td></tr>
+        </tbody>
+    </table>
+
+    <script>
+        async function loadData() {
+            try {
+                const res = await fetch('/api/summary');
+                const data = await res.json();
+
+                const tbody = document.getElementById('expenseList');
+                tbody.innerHTML = '';
+
+                let husbandPaidTotal = 0;
+                let wifePaidTotal = 0;
+                let husbandBurdenTotal = 0;
+                let wifeBurdenTotal = 0;
+
+                // 履歴をテーブルに追加しながら金額を集計
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    const dateStr = new Date(row.date).toLocaleDateString('ja-JP');
+                    tr.innerHTML = `
+                        <td>${dateStr}</td>
+                        <td>${row.description}</td>
+                        <td>${row.payer}</td>
+                        <td>${row.total_amount}円</td>
+                        <td>${row.husband_burden}円</td>
+                        <td>${row.wife_burden}円</td>
+                    `;
+                    tbody.appendChild(tr);
+
+                    if (row.payer === '夫') husbandPaidTotal += row.total_amount;
+                    if (row.payer === '妻') wifePaidTotal += row.total_amount;
+                    husbandBurdenTotal += row.husband_burden;
+                    wifeBurdenTotal += row.wife_burden;
+                });
+
+                // 誰がいくら多めに払っているか（立替残高）を計算
+                const husbandBalance = husbandPaidTotal - husbandBurdenTotal;
+                const wifeBalance = wifePaidTotal - wifeBurdenTotal;
+
+                let settlementText = "";
+                if (husbandBalance > 0) {
+                    settlementText = `現在、<strong>妻</strong> から <strong>夫</strong> へ <span class="amount">${husbandBalance}円</span> 支払うと精算完了です。`;
+                } else if (wifeBalance > 0) {
+                    settlementText = `現在、<strong>夫</strong> から <strong>妻</strong> へ <span class="amount">${wifeBalance}円</span> 支払うと精算完了です。`;
+                } else {
+                    settlementText = "現在、精算の必要はありません（負担はピッタリです）。";
+                }
+
+                document.getElementById('summaryBox').innerHTML = `
+                    <p>・夫が立て替えている額（未精算）: ${husbandBalance}円</p>
+                    <p>・妻が立て替えている額（未精算）: ${wifeBalance}円</p>
+                    <hr style="border:0; border-top:1px dashed #ccc; margin: 15px 0;">
+                    <p>${settlementText}</p>
+                `;
+
+            } catch (error) {
+                document.getElementById('summaryBox').textContent = "データの読み込みに失敗しました。";
+            }
+        }
+        loadData();
+    </script>
+</body>
+</html>
