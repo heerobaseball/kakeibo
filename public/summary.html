@@ -17,6 +17,7 @@
         dialog { padding: 20px; border-radius: 8px; border: 1px solid #ccc; width: 90%; max-width: 400px; }
         dialog input, dialog select { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
         .genre-badge { display: inline-block; padding: 3px 6px; background-color: #17a2b8; color: white; border-radius: 4px; font-size: 0.8em;}
+        .image-link { display: inline-block; padding: 4px 8px; background-color: #007bff; color: white; border-radius: 4px; text-decoration: none; font-size: 0.9em; }
     </style>
 </head>
 <body>
@@ -34,6 +35,7 @@
                 <tr>
                     <th>精算</th>
                     <th>日付</th>
+                    <th>画像</th>
                     <th>ジャンル</th>
                     <th>内容</th>
                     <th>支払</th>
@@ -44,7 +46,7 @@
                 </tr>
             </thead>
             <tbody id="expenseList">
-                <tr><td colspan="9">読み込み中...</td></tr>
+                <tr><td colspan="10">読み込み中...</td></tr>
             </tbody>
         </table>
     </div>
@@ -86,16 +88,18 @@
                 const tr = document.createElement('tr');
                 if (row.is_settled === 1) tr.classList.add('settled-row');
                 
-                // YYYY-MM-DDなどを日本の見やすい形式に
                 const dateObj = new Date(row.date);
                 const dateStr = isNaN(dateObj) ? row.date : dateObj.toLocaleDateString('ja-JP');
-                
                 const checkboxHtml = row.is_settled === 1 ? '済' : `<input type="checkbox" class="settle-check" value="${row.id}">`;
                 const genreText = row.genre || 'その他';
+
+                // 画像IDがあれば「🖼️ 見る」ボタンを表示、なければ「-」
+                const imageHtml = row.image_id ? `<a href="/api/image?id=${row.image_id}" target="_blank" class="image-link" title="レシート画像を開く">🖼️ 見る</a>` : '-';
 
                 tr.innerHTML = `
                     <td style="text-align:center;">${checkboxHtml}</td>
                     <td>${dateStr}</td>
+                    <td style="text-align:center;">${imageHtml}</td>
                     <td><span class="genre-badge">${genreText}</span></td>
                     <td>${row.description}</td>
                     <td>${row.payer}</td>
@@ -148,15 +152,9 @@
 
         function openEdit(row) {
             document.getElementById('editId').value = row.id;
-            
-            // 日付を YYYY-MM-DD 形式に直してカレンダーにセットする
             let editDateStr = "";
-            if (row.date) {
-                // データベースに入っている形式(例: 2024-05-20T12:00:00Z)から先頭10文字を切り取る
-                editDateStr = String(row.date).substring(0, 10);
-            }
+            if (row.date) editDateStr = String(row.date).substring(0, 10);
             document.getElementById('editDate').value = editDateStr;
-            
             document.getElementById('editGenre').value = row.genre || 'その他';
             document.getElementById('editDesc').value = row.description;
             document.getElementById('editPayer').value = row.payer;

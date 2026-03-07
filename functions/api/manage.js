@@ -1,27 +1,22 @@
-export async function onRequestPost(context) {
+export async function onRequestGet(context) {
   const env = context.env;
-  try {
-    const data = await context.request.json();
-    
-    if (data.action === 'delete') {
-      await env.DB.prepare("DELETE FROM expenses WHERE id = ?").bind(data.id).run();
-    } 
-    else if (data.action === 'update') {
-      // date（決済日）も含めて更新する
-      await env.DB.prepare(
-        "UPDATE expenses SET date = ?, description = ?, total_amount = ?, payer = ?, husband_burden = ?, wife_burden = ?, genre = ? WHERE id = ?"
-      ).bind(data.date, data.description, data.total_amount, data.payer, data.husband_burden, data.wife_burden, data.genre, data.id).run();
-    } 
-    else if (data.action === 'settle') {
-      const ids = data.ids;
-      if(ids && ids.length > 0) {
-        const placeholders = ids.map(() => '?').join(',');
-        await env.DB.prepare(`UPDATE expenses SET is_settled = 1 WHERE id IN (${placeholders})`).bind(...ids).run();
-      }
-    }
+  const url = new URL(context.request.url);
+  const id = url.searchParams.get('id');
 
-    return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' }});
+  if (!id) return new Response('Not Found', { status: 404 });
+
+  try {
+    // R2バケットから画像データを取得
+    const object = await env.RECEIPT_BUCKET.get(id);
+    if (!object) return new Response('Image Not Found', { status: 404 });
+
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('etag', object.httpEtag);
+    headers.set('Cache-Control', 'public, max-age=31536000'); // ブラウザにキャッシュさせる
+
+    return new Response(object.body, { headers });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    return new Response(error.message, { status: 500 });
   }
 }

@@ -22,7 +22,6 @@
     <a href="/summary.html" style="display:block; text-align:center; margin-bottom: 20px; background:#28a745; color:#fff; padding:12px; text-decoration:none; border-radius:5px; font-weight:bold;">📊 集計結果・履歴を見る</a>
     
     <h2>支出の登録</h2>
-    
     <div>
         <button id="tabImage" class="tab-btn active">📷 レシート画像で登録</button>
         <button id="tabText" class="tab-btn">✍️ 文字入力で登録</button>
@@ -64,26 +63,17 @@
         dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files.length > 0) { imageInput.files = e.dataTransfer.files; fileNameDisplay.textContent = `選択中: ${e.dataTransfer.files[0].name}`; } });
         imageInput.addEventListener('change', () => { if (imageInput.files.length > 0) fileNameDisplay.textContent = `選択中: ${imageInput.files[0].name}`; });
 
-        // 今日の日付を取得してAIに教える（基準日として使うため）
         const todayStr = new Date().toLocaleDateString('ja-JP');
-
         const basePrompt = `本日は ${todayStr} です。以下の情報を解析し、指定されたJSONフォーマットで出力してください。JSON以外のテキストは絶対に含めないでください。
 ルール:
-1. "date" は、レシートに印字されている日付、または入力内容から推測される決済日を "YYYY-MM-DD" 形式で出力してください。年が省略されている場合は今年とし、全く推測できない場合は本日の日付にしてください。
-2. "payer" (支払った人) は必ず "夫" または "妻" のいずれかに統一してください。
+1. "date" は、レシートに印字されている日付、または入力内容から推測される決済日を "YYYY-MM-DD" 形式で出力。
+2. "payer" (支払った人) は必ず "夫" または "妻" のいずれかに統一。
 3. "genre" (ジャンル) は以下の4つの中から最も適したものを選んでください: ["食料品、日用品", "外食費", "旅費", "その他"]
 フォーマット:
-{
-  "date": "YYYY-MM-DD",
-  "description": "購入した主な品目や店舗名",
-  "total_amount": 合計金額(数値),
-  "payer": "夫 または 妻",
-  "husband_burden": 夫の負担額(数値),
-  "wife_burden": 妻の負担額(数値),
-  "genre": "選んだジャンル"
-}`;
+{ "date": "YYYY-MM-DD", "description": "購入した主な品目や店舗名", "total_amount": 合計金額(数値), "payer": "夫 または 妻", "husband_burden": 夫の負担額(数値), "wife_burden": 妻の負担額(数値), "genre": "選んだジャンル" }`;
 
-        async function processAI(contentsArray, resultDiv, formElement) {
+        // 共通AI処理（画像ファイルがあれば一緒にFormDataに入れて送信する）
+        async function processAI(contentsArray, resultDiv, formElement, originalFile = null) {
             try {
                 resultDiv.textContent = "AI解析の準備中...";
                 const configRes = await fetch('/api/config'); const configData = await configRes.json();
@@ -91,7 +81,6 @@
 
                 resultDiv.textContent = "Geminiが解析中...";
                 const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${configData.apiKey}`;
-                
                 const geminiRes = await fetch(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: contentsArray }] }) });
                 const geminiData = await geminiRes.json();
                 if (!geminiRes.ok) throw new Error(`Googleエラー: ${geminiData.error?.message || '詳細不明'}`);
@@ -99,8 +88,16 @@
                 let resultText = geminiData.candidates[0].content.parts[0].text.replace(/```json\n|\n```/g, '');
                 const parsedData = JSON.parse(resultText);
 
-                resultDiv.textContent = "データをデータベースに保存中...";
-                const saveRes = await fetch('/api/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(parsedData) });
+                resultDiv.textContent = "データをデータベースとストレージに保存中...";
+                
+                // 画像ファイルとJSONデータをセットにして送信
+                const formData = new FormData();
+                formData.append('data', JSON.stringify(parsedData));
+                if (originalFile) {
+                    formData.append('image', originalFile);
+                }
+
+                const saveRes = await fetch('/api/upload', { method: 'POST', body: formData });
                 const saveData = await saveRes.json();
                 
                 if(saveData.success) {
@@ -116,7 +113,8 @@
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const base64Image = e.target.result.split(',')[1];
-                await processAI([{ text: prompt }, { inline_data: { mime_type: file.type, data: base64Image } }], document.getElementById('result'), document.getElementById('uploadForm'));
+                // 第4引数に元の画像ファイル(file)を渡して、裏側でR2に保存させる
+                await processAI([{ text: prompt }, { inline_data: { mime_type: file.type, data: base64Image } }], document.getElementById('result'), document.getElementById('uploadForm'), file);
             };
             reader.readAsDataURL(file);
         });
