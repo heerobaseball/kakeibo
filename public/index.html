@@ -9,14 +9,20 @@
         input, textarea, button, select { width: 100%; margin-bottom: 15px; padding: 10px; box-sizing: border-box; }
         button { background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 12px; font-weight: bold; }
         button:hover { background-color: #0056b3; }
-        #dropZone { border: 2px dashed #007bff; border-radius: 5px; padding: 30px; text-align: center; background-color: #f8f9fa; cursor: pointer; margin-bottom: 15px; }
+        #dropZone { border: 2px dashed #007bff; border-radius: 5px; padding: 20px; text-align: center; background-color: #f8f9fa; margin-bottom: 15px; }
         #dropZone.dragover { background-color: #e2e6ea; border-color: #0056b3; }
-        #imageInput { display: none; }
         .tab-btn { background-color: #eee; color: #333; width: 48%; display: inline-block; margin-bottom: 10px; }
         .tab-btn.active { background-color: #007bff; color: white; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         .result-item { margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background-color: #fdfdfd; font-size: 0.9em; }
+        
+        /* カメラ・フォルダ選択ボタンのスタイル */
+        .action-buttons { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+        .btn-camera { background-color: #28a745; margin: 0; padding: 12px 5px; width: 50%; font-size: 0.95em; }
+        .btn-gallery { background-color: #17a2b8; margin: 0; padding: 12px 5px; width: 50%; font-size: 0.95em; }
+        .btn-camera:hover { background-color: #218838; }
+        .btn-gallery:hover { background-color: #138496; }
     </style>
 </head>
 <body>
@@ -30,10 +36,20 @@
 
     <form id="uploadForm" class="tab-content active">
         <div id="dropZone">
-            <p>レシート画像をドラッグ＆ドロップ<br>またはクリックして選択（複数選択OK！）</p>
-            <input type="file" id="imageInput" accept="image/*" multiple>
-            <div id="fileName" style="margin-top:10px; font-size:1em; font-weight:bold; color:#007bff;"></div>
+            <p style="margin-top: 0; margin-bottom: 5px; font-weight: bold;">レシートの登録方法</p>
+            <p style="margin-top: 0; font-size: 0.85em; color: #666;">（PCの場合はここにドラッグ＆ドロップも可能）</p>
+            
+            <div class="action-buttons">
+                <button type="button" class="btn-camera" id="btnCamera">📷 カメラで撮る</button>
+                <button type="button" class="btn-gallery" id="btnGallery">🖼️ フォルダから</button>
+            </div>
+            
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;">
+            <input type="file" id="galleryInput" accept="image/*" multiple style="display:none;">
+            
+            <div id="fileName" style="margin-top:15px; font-size:1em; font-weight:bold; color:#007bff;"></div>
         </div>
+
         <label>共通コメント (例: 全て妻が支払い。食費は折半、化粧品は妻負担):</label>
         <textarea id="commentInputImage" rows="3" placeholder="支払った人や負担割合を入力してください"></textarea>
         <button type="submit" id="submitBtn">AIで一括解析して登録</button>
@@ -58,14 +74,18 @@
         });
 
         const dropZone = document.getElementById('dropZone'); 
-        const imageInput = document.getElementById('imageInput'); 
+        const cameraInput = document.getElementById('cameraInput'); 
+        const galleryInput = document.getElementById('galleryInput'); 
         const fileNameDisplay = document.getElementById('fileName');
-        
-        dropZone.addEventListener('click', () => imageInput.click());
-        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-        
+
+        // ボタンが押されたら裏側のファイル入力をクリックする
+        document.getElementById('btnCamera').addEventListener('click', () => cameraInput.click());
+        document.getElementById('btnGallery').addEventListener('click', () => galleryInput.click());
+
+        let currentSelectedFiles = []; // 現在選ばれているファイルを保持
+
         function updateFileDisplay(files) {
+            currentSelectedFiles = files;
             if (files.length === 0) {
                 fileNameDisplay.textContent = "";
             } else if (files.length === 1) {
@@ -75,16 +95,32 @@
             }
         }
 
+        // カメラで撮影された時
+        cameraInput.addEventListener('change', () => {
+            if(cameraInput.files.length > 0) {
+                galleryInput.value = ''; // フォルダ側をリセット
+                updateFileDisplay(cameraInput.files);
+            }
+        });
+
+        // フォルダから選ばれた時
+        galleryInput.addEventListener('change', () => {
+            if(galleryInput.files.length > 0) {
+                cameraInput.value = ''; // カメラ側をリセット
+                updateFileDisplay(galleryInput.files);
+            }
+        });
+
+        // PCからのドラッグ&ドロップ対応
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
         dropZone.addEventListener('drop', (e) => { 
             e.preventDefault(); dropZone.classList.remove('dragover'); 
             if (e.dataTransfer.files.length > 0) { 
-                imageInput.files = e.dataTransfer.files; 
-                updateFileDisplay(imageInput.files);
+                galleryInput.files = e.dataTransfer.files; 
+                cameraInput.value = '';
+                updateFileDisplay(galleryInput.files);
             } 
-        });
-        
-        imageInput.addEventListener('change', () => { 
-            updateFileDisplay(imageInput.files); 
         });
 
         const todayStr = new Date().toLocaleDateString('ja-JP');
@@ -142,9 +178,9 @@
 
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault(); 
-            const files = imageInput.files; 
+            const files = currentSelectedFiles; // 統合されたファイル配列を使用
             
-            if (files.length === 0) { alert("画像を選択してください"); return; }
+            if (files.length === 0) { alert("カメラで撮影するか、画像を選択してください"); return; }
             if (files.length > 5) { alert("一度に処理できるのは最大5枚までです。\nお手数ですが5枚以下に分けて登録してください。"); return; }
 
             const submitBtn = document.getElementById('submitBtn');
@@ -177,6 +213,7 @@
             }
 
             document.getElementById('uploadForm').reset();
+            currentSelectedFiles = []; // 選択状況をリセット
             fileNameDisplay.textContent = "全ての処理が完了しました！";
             submitBtn.disabled = false;
             submitBtn.textContent = "AIで一括解析して登録";
