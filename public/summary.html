@@ -10,19 +10,19 @@
         a.button, button.action-btn { background-color: #6c757d; color: white; border: none; padding: 6px 10px; border-radius: 5px; cursor: pointer; text-decoration: none; font-size: 0.9em; }
         button.settle-btn { background-color: #28a745; margin-top: 10px; width: 100%; padding: 10px; font-weight: bold; }
         
-        .month-selector { font-size: 1.2em; font-weight: bold; padding: 8px; border-radius: 5px; border: 1px solid #ccc; }
+        .month-selector { font-size: 1.2em; font-weight: bold; padding: 8px; border-radius: 5px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
 
         .dashboard { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
         
-        .summary-panel { flex: 0 0 320px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .summary-panel { flex: 0 0 320px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); box-sizing: border-box; }
         .summary-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 0.9em; }
         .summary-table th, .summary-table td { border: 1px solid #ddd; padding: 8px; text-align: right; }
         .summary-table th { background-color: #f4f4f4; text-align: left; }
         .amount { font-size: 1.2em; font-weight: bold; color: #d9534f; }
         .total-row { background-color: #e9ecef; font-weight: bold; }
 
-        .details-panel { flex: 1; display: flex; gap: 15px; overflow-x: auto; padding-bottom: 15px; }
-        .genre-table-container { min-width: 450px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .details-panel { flex: 1; display: flex; gap: 15px; overflow-x: auto; padding-bottom: 15px; box-sizing: border-box; }
+        .genre-table-container { min-width: 450px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); box-sizing: border-box; }
         .genre-table-container h3 { margin-top: 0; padding-bottom: 5px; border-bottom: 2px solid #007bff; font-size: 1.1em; color: #007bff; }
         
         table.detail-table { width: 100%; border-collapse: collapse; font-size: 0.8em; }
@@ -33,13 +33,33 @@
 
         dialog { padding: 20px; border-radius: 8px; border: 1px solid #ccc; width: 90%; max-width: 400px; }
         dialog input, dialog select { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
+
+        /* =========================================
+           📱 スマホ向けレスポンシブデザイン（追加部分）
+           ========================================= */
+        @media (max-width: 768px) {
+            .header { flex-direction: column; align-items: stretch; gap: 15px; }
+            .header > a { text-align: center; padding: 12px; font-weight: bold; }
+            
+            .dashboard { flex-direction: column; }
+            
+            /* サマリーパネルを画面幅いっぱいに */
+            .summary-panel { flex: none; width: 100%; }
+            
+            /* ジャンル別の表を縦並びに変更 */
+            .details-panel { flex-direction: column; width: 100%; overflow-x: hidden; }
+            .genre-table-container { min-width: 100%; width: 100%; }
+            
+            /* テーブルがスマホ画面より大きい場合は、枠内だけで横スクロールさせる */
+            table.detail-table { min-width: 450px; }
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <a href="/" class="button">← レシート登録に戻る</a>
         <div>
-            <label for="periodSelect">表示月度:</label>
+            <label for="periodSelect" style="display:block; margin-bottom:5px;">表示月度:</label>
             <select id="periodSelect" class="month-selector" onchange="renderDashboard()"></select>
         </div>
     </div>
@@ -95,10 +115,8 @@
 
     <script>
         let allData = [];
-        // ジャンルから通信費を削除した4種類
         const genres = ['食料品、日用品', '外食費', '旅費', 'その他'];
 
-        // 日付から「25日締め」の月度を計算する関数
         function getPeriod(dateString) {
             const d = new Date(dateString);
             if (isNaN(d)) return "不明";
@@ -106,7 +124,6 @@
             let m = d.getMonth() + 1;
             let date = d.getDate();
             
-            // 26日以降なら翌月扱い
             if (date >= 26) {
                 m += 1;
                 if (m > 12) { m = 1; y += 1; }
@@ -156,7 +173,6 @@
             const detailsPanel = document.getElementById('detailsPanel');
             detailsPanel.innerHTML = '';
 
-            // ジャンルごとのテーブル作成
             genres.forEach(genre => {
                 const genreData = filteredData.filter(row => (row.genre || 'その他') === genre);
                 
@@ -184,7 +200,6 @@
                         </tr>
                     `;
 
-                    // 集計計算（未精算のみ立替計算に含める）
                     const total = Number(row.total_amount) || 0;
                     totalSummary[genre] += total;
                     grandTotal += total;
@@ -204,24 +219,25 @@
                     }
                 });
 
-                // ジャンルごとのパネルHTML
+                /* スマホ用に横スクロール領域 (overflow-x: auto) を追加しています */
                 const tableHtml = `
                     <div class="genre-table-container">
                         <h3>${genre}</h3>
-                        <table class="detail-table">
-                            <thead>
-                                <tr>
-                                    <th>精算</th><th>日付</th><th>備考</th><th>支払</th><th>合計</th><th>夫負担</th><th>妻負担</th><th>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody>${tbodyHtml || '<tr><td colspan="8" style="text-align:center;">データなし</td></tr>'}</tbody>
-                        </table>
+                        <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                            <table class="detail-table">
+                                <thead>
+                                    <tr>
+                                        <th>精算</th><th>日付</th><th>備考</th><th>支払</th><th>合計</th><th>夫負担</th><th>妻負担</th><th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${tbodyHtml || '<tr><td colspan="8" style="text-align:center;">データなし</td></tr>'}</tbody>
+                            </table>
+                        </div>
                     </div>
                 `;
                 detailsPanel.insertAdjacentHTML('beforeend', tableHtml);
             });
 
-            // 左側のサマリー表を更新
             const summaryTbody = document.getElementById('summaryTbody');
             summaryTbody.innerHTML = '';
             genres.forEach(genre => {
@@ -229,7 +245,6 @@
             });
             summaryTbody.insertAdjacentHTML('beforeend', `<tr class="total-row"><td>合計</td><td>${grandTotal.toLocaleString()}円</td></tr>`);
 
-            // 立替状況の更新
             const finalHusbandReceive = husbandBalance > 0 ? husbandBalance : 0;
             const finalWifeReceive = wifeBalance > 0 ? wifeBalance : 0;
 
@@ -290,7 +305,6 @@
             loadData();
         }
 
-        // 初期読み込み
         loadData();
     </script>
 </body>
