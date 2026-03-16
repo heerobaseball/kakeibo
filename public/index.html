@@ -16,6 +16,7 @@
         .tab-btn.active { background-color: #007bff; color: white; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
+        .result-item { margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background-color: #fdfdfd; font-size: 0.9em; }
     </style>
 </head>
 <body>
@@ -29,13 +30,13 @@
 
     <form id="uploadForm" class="tab-content active">
         <div id="dropZone">
-            <p>レシート画像をドラッグ＆ドロップ<br>またはクリックして選択</p>
-            <input type="file" id="imageInput" accept="image/*" capture="environment">
-            <div id="fileName" style="margin-top:10px; font-size:0.9em; color:#555;"></div>
+            <p>レシート画像をドラッグ＆ドロップ<br>またはクリックして選択（複数選択OK！）</p>
+            <input type="file" id="imageInput" accept="image/*" multiple>
+            <div id="fileName" style="margin-top:10px; font-size:1em; font-weight:bold; color:#007bff;"></div>
         </div>
-        <label>コメント (例: 妻がクレカで支払い。食費は折半、化粧品は妻負担):</label>
+        <label>共通コメント (例: 全て妻が支払い。食費は折半、化粧品は妻負担):</label>
         <textarea id="commentInputImage" rows="3" placeholder="支払った人や負担割合を入力してください"></textarea>
-        <button type="submit">AIで画像解析して登録</button>
+        <button type="submit" id="submitBtn">AIで一括解析して登録</button>
     </form>
 
     <form id="textForm" class="tab-content">
@@ -44,7 +45,7 @@
         <button type="submit">AIで文字解析して登録</button>
     </form>
     
-    <div id="result" style="margin-top: 15px; font-weight: bold;"></div>
+    <div id="resultArea" style="margin-top: 15px;"></div>
 
     <script>
         document.getElementById('tabImage').addEventListener('click', () => {
@@ -56,12 +57,35 @@
             document.getElementById('textForm').classList.add('active'); document.getElementById('uploadForm').classList.remove('active');
         });
 
-        const dropZone = document.getElementById('dropZone'); const imageInput = document.getElementById('imageInput'); const fileNameDisplay = document.getElementById('fileName');
+        const dropZone = document.getElementById('dropZone'); 
+        const imageInput = document.getElementById('imageInput'); 
+        const fileNameDisplay = document.getElementById('fileName');
+        
         dropZone.addEventListener('click', () => imageInput.click());
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files.length > 0) { imageInput.files = e.dataTransfer.files; fileNameDisplay.textContent = `選択中: ${e.dataTransfer.files[0].name}`; } });
-        imageInput.addEventListener('change', () => { if (imageInput.files.length > 0) fileNameDisplay.textContent = `選択中: ${imageInput.files[0].name}`; });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'); });
+        
+        function updateFileDisplay(files) {
+            if (files.length === 0) {
+                fileNameDisplay.textContent = "";
+            } else if (files.length === 1) {
+                fileNameDisplay.textContent = `選択中: ${files[0].name}`;
+            } else {
+                fileNameDisplay.textContent = `選択中: ${files.length}枚のレシート画像`;
+            }
+        }
+
+        dropZone.addEventListener('drop', (e) => { 
+            e.preventDefault(); dropZone.classList.remove('dragover'); 
+            if (e.dataTransfer.files.length > 0) { 
+                imageInput.files = e.dataTransfer.files; 
+                updateFileDisplay(imageInput.files);
+            } 
+        });
+        
+        imageInput.addEventListener('change', () => { 
+            updateFileDisplay(imageInput.files); 
+        });
 
         const todayStr = new Date().toLocaleDateString('ja-JP');
         const basePrompt = `本日は ${todayStr} です。以下の情報を解析し、指定されたJSONフォーマットで出力してください。JSON以外のテキストは絶対に含めないでください。
@@ -72,56 +96,106 @@
 フォーマット:
 { "date": "YYYY-MM-DD", "description": "購入した主な品目や店舗名", "total_amount": 合計金額(数値), "payer": "夫 または 妻", "husband_burden": 夫の負担額(数値), "wife_burden": 妻の負担額(数値), "genre": "選んだジャンル" }`;
 
-        // 共通AI処理（画像ファイルがあれば一緒にFormDataに入れて送信する）
-        async function processAI(contentsArray, resultDiv, formElement, originalFile = null) {
+        async function processAI(contentsArray, statusDiv, originalFile = null) {
             try {
-                resultDiv.textContent = "AI解析の準備中...";
+                statusDiv.innerHTML = `<strong>${originalFile ? originalFile.name : 'テキスト入力'}</strong><br>⏳ AI解析の準備中...`;
+                
                 const configRes = await fetch('/api/config'); const configData = await configRes.json();
                 if (!configData.apiKey) throw new Error("APIキーが取得できません。");
 
-                resultDiv.textContent = "Geminiが解析中...";
+                statusDiv.innerHTML = `<strong>${originalFile ? originalFile.name : 'テキスト入力'}</strong><br>🧠 Geminiが解析中...`;
+                
                 const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${configData.apiKey}`;
                 const geminiRes = await fetch(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: contentsArray }] }) });
                 const geminiData = await geminiRes.json();
-                if (!geminiRes.ok) throw new Error(`Googleエラー: ${geminiData.error?.message || '詳細不明'}`);
+                
+                if (!geminiRes.ok) {
+                    if(geminiData.error?.code === 429) throw new Error('APIの制限回数を超えました。少し待ってから再度お試しください。');
+                    throw new Error(`Googleエラー: ${geminiData.error?.message || '詳細不明'}`);
+                }
                 
                 let resultText = geminiData.candidates[0].content.parts[0].text.replace(/```json\n|\n```/g, '');
                 const parsedData = JSON.parse(resultText);
 
-                resultDiv.textContent = "データをデータベースとストレージに保存中...";
+                statusDiv.innerHTML = `<strong>${originalFile ? originalFile.name : 'テキスト入力'}</strong><br>💾 データを保存中...`;
                 
-                // 画像ファイルとJSONデータをセットにして送信
                 const formData = new FormData();
                 formData.append('data', JSON.stringify(parsedData));
-                if (originalFile) {
-                    formData.append('image', originalFile);
-                }
+                if (originalFile) formData.append('image', originalFile);
 
                 const saveRes = await fetch('/api/upload', { method: 'POST', body: formData });
                 const saveData = await saveRes.json();
                 
                 if(saveData.success) {
-                    resultDiv.innerHTML = `<p style="color:green;">✅ 登録完了!</p>決済日: ${saveData.data.date} / 内容: [${saveData.data.genre}] ${saveData.data.description} / 合計: ${saveData.data.total_amount}円`;
-                    formElement.reset(); if(fileNameDisplay) fileNameDisplay.textContent = "";
-                } else { throw new Error(saveData.error); }
-            } catch (err) { resultDiv.textContent = "エラーが発生しました: " + err.message; }
+                    statusDiv.innerHTML = `<strong>${originalFile ? originalFile.name : 'テキスト入力'}</strong><br><span style="color:green;">✅ 登録完了!</span><br>決済日: ${saveData.data.date} / 内容: [${saveData.data.genre}] ${saveData.data.description} / 合計: ${saveData.data.total_amount}円`;
+                    statusDiv.style.backgroundColor = "#e8f5e9";
+                    statusDiv.style.borderColor = "#c8e6c9";
+                } else { 
+                    throw new Error(saveData.error); 
+                }
+            } catch (err) { 
+                statusDiv.innerHTML = `<strong>${originalFile ? originalFile.name : 'テキスト入力'}</strong><br><span style="color:red;">❌ エラーが発生しました: ${err.message}</span>`; 
+                statusDiv.style.backgroundColor = "#ffebee";
+                statusDiv.style.borderColor = "#ffcdd2";
+            }
         }
 
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-            e.preventDefault(); const file = imageInput.files[0]; if (!file) { alert("画像を選択してください"); return; }
-            const prompt = basePrompt + `\n\n【ユーザーコメント】: "${document.getElementById('commentInputImage').value}"\n【画像】: 添付のレシート`;
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const base64Image = e.target.result.split(',')[1];
-                // 第4引数に元の画像ファイル(file)を渡して、裏側でR2に保存させる
-                await processAI([{ text: prompt }, { inline_data: { mime_type: file.type, data: base64Image } }], document.getElementById('result'), document.getElementById('uploadForm'), file);
-            };
-            reader.readAsDataURL(file);
+            e.preventDefault(); 
+            const files = imageInput.files; 
+            
+            if (files.length === 0) { alert("画像を選択してください"); return; }
+            // ここで最大5枚に制限しています
+            if (files.length > 5) { alert("一度に処理できるのは最大5枚までです。\nお手数ですが5枚以下に分けて登録してください。"); return; }
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = "処理中...";
+
+            const resultArea = document.getElementById('resultArea');
+            resultArea.innerHTML = "";
+
+            const comment = document.getElementById('commentInputImage').value;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const statusDiv = document.createElement('div');
+                statusDiv.className = "result-item";
+                statusDiv.innerHTML = `<strong>${file.name}</strong><br>順番待ち...`;
+                resultArea.appendChild(statusDiv);
+
+                const prompt = basePrompt + `\n\n【ユーザー共通コメント】: "${comment}"\n【画像】: 添付のレシート`;
+                
+                await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        const base64Image = e.target.result.split(',')[1];
+                        await processAI([{ text: prompt }, { inline_data: { mime_type: file.type, data: base64Image } }], statusDiv, file);
+                        resolve();
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            document.getElementById('uploadForm').reset();
+            fileNameDisplay.textContent = "全ての処理が完了しました！";
+            submitBtn.disabled = false;
+            submitBtn.textContent = "AIで一括解析して登録";
         });
 
         document.getElementById('textForm').addEventListener('submit', async (e) => {
-            e.preventDefault(); const text = document.getElementById('textInput').value; if (!text) { alert("支出の内容を入力してください"); return; }
-            await processAI([{ text: basePrompt + `\n\n【入力内容】: "${text}"` }], document.getElementById('result'), document.getElementById('textForm'));
+            e.preventDefault(); 
+            const text = document.getElementById('textInput').value; 
+            if (!text) { alert("支出の内容を入力してください"); return; }
+
+            const resultArea = document.getElementById('resultArea');
+            resultArea.innerHTML = "";
+            const statusDiv = document.createElement('div');
+            statusDiv.className = "result-item";
+            resultArea.appendChild(statusDiv);
+
+            await processAI([{ text: basePrompt + `\n\n【入力内容】: "${text}"` }], statusDiv);
+            document.getElementById('textForm').reset();
         });
     </script>
 </body>
