@@ -5,50 +5,69 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>集計結果 - ふたりの家計簿</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; max-width: 900px; margin: 0 auto; color: #333; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85em; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-        th { background-color: #f4f4f4; }
-        .summary-box { background-color: #e9ecef; padding: 20px; border-radius: 8px; margin-top: 20px; line-height: 1.6; }
-        .amount { font-size: 1.3em; font-weight: bold; color: #d9534f; }
-        a.button, button.action-btn { background-color: #6c757d; color: white; border: none; padding: 6px 10px; border-radius: 5px; cursor: pointer; text-decoration: none; }
-        button.settle-btn { background-color: #28a745; margin-bottom: 10px; padding: 10px;}
-        .settled-row { background-color: #f8f9fa; color: #aaa; }
+        body { font-family: sans-serif; padding: 15px; margin: 0; color: #333; background-color: #f8f9fa; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        a.button, button.action-btn { background-color: #6c757d; color: white; border: none; padding: 6px 10px; border-radius: 5px; cursor: pointer; text-decoration: none; font-size: 0.9em; }
+        button.settle-btn { background-color: #28a745; margin-top: 10px; width: 100%; padding: 10px; font-weight: bold; }
+        
+        .month-selector { font-size: 1.2em; font-weight: bold; padding: 8px; border-radius: 5px; border: 1px solid #ccc; }
+
+        .dashboard { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+        
+        .summary-panel { flex: 0 0 320px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .summary-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 0.9em; }
+        .summary-table th, .summary-table td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+        .summary-table th { background-color: #f4f4f4; text-align: left; }
+        .amount { font-size: 1.2em; font-weight: bold; color: #d9534f; }
+        .total-row { background-color: #e9ecef; font-weight: bold; }
+
+        .details-panel { flex: 1; display: flex; gap: 15px; overflow-x: auto; padding-bottom: 15px; }
+        .genre-table-container { min-width: 450px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .genre-table-container h3 { margin-top: 0; padding-bottom: 5px; border-bottom: 2px solid #007bff; font-size: 1.1em; color: #007bff; }
+        
+        table.detail-table { width: 100%; border-collapse: collapse; font-size: 0.8em; }
+        table.detail-table th, table.detail-table td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+        table.detail-table th { background-color: #f4f4f4; white-space: nowrap; }
+        .settled-row { background-color: #f8f9fa; color: #aaa; text-decoration: line-through; }
+        .image-link { display: inline-block; padding: 2px 5px; background-color: #17a2b8; color: white; border-radius: 3px; text-decoration: none; font-size: 0.8em; }
+
         dialog { padding: 20px; border-radius: 8px; border: 1px solid #ccc; width: 90%; max-width: 400px; }
         dialog input, dialog select { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
-        .genre-badge { display: inline-block; padding: 3px 6px; background-color: #17a2b8; color: white; border-radius: 4px; font-size: 0.8em;}
-        .image-link { display: inline-block; padding: 4px 8px; background-color: #007bff; color: white; border-radius: 4px; text-decoration: none; font-size: 0.9em; }
     </style>
 </head>
 <body>
-    <a href="/" class="button">← レシート登録に戻る</a>
-    <h2>💸 今月の精算（未精算分の立替）</h2>
+    <div class="header">
+        <a href="/" class="button">← レシート登録に戻る</a>
+        <div>
+            <label for="periodSelect">表示月度:</label>
+            <select id="periodSelect" class="month-selector" onchange="renderDashboard()"></select>
+        </div>
+    </div>
     
-    <div id="summaryBox" class="summary-box">データを計算中...</div>
+    <div class="dashboard">
+        <div class="summary-panel">
+            <h2>💸 月次サマリー</h2>
+            <table class="summary-table">
+                <thead>
+                    <tr><th>ジャンル</th><th>合計金額</th></tr>
+                </thead>
+                <tbody id="summaryTbody">
+                    </tbody>
+            </table>
 
-    <h2>📜 履歴一覧</h2>
-    <button class="action-btn settle-btn" onclick="settleSelected()">☑ 選択した項目を「精算済み」にする</button>
-    
-    <div style="overflow-x: auto;">
-        <table>
-            <thead>
-                <tr>
-                    <th>精算</th>
-                    <th>日付</th>
-                    <th>画像</th>
-                    <th>ジャンル</th>
-                    <th>内容</th>
-                    <th>支払</th>
-                    <th>合計</th>
-                    <th>夫負担</th>
-                    <th>妻負担</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody id="expenseList">
-                <tr><td colspan="10">読み込み中...</td></tr>
-            </tbody>
-        </table>
+            <div style="background-color: #e9ecef; padding: 15px; border-radius: 8px; line-height: 1.6;">
+                <strong>【未精算分の立替状況】</strong>
+                <p style="margin: 5px 0; font-size:0.9em;">夫の立替額: <span id="husbandBal">0</span>円</p>
+                <p style="margin: 5px 0; font-size:0.9em;">妻の立替額: <span id="wifeBal">0</span>円</p>
+                <hr style="border:0; border-top:1px dashed #ccc; margin: 10px 0;">
+                <p id="settlementText" style="margin: 0;">データを計算中...</p>
+            </div>
+            
+            <button class="action-btn settle-btn" onclick="settleSelected()">☑ 選択した項目を「精算済み」にする</button>
+        </div>
+
+        <div class="details-panel" id="detailsPanel">
+            </div>
     </div>
 
     <dialog id="editModal">
@@ -62,7 +81,7 @@
             <option value="旅費">旅費</option>
             <option value="その他">その他</option>
         </select>
-        <label>内容:</label><input type="text" id="editDesc">
+        <label>備考(内容):</label><input type="text" id="editDesc">
         <label>支払った人:</label>
         <select id="editPayer"><option value="夫">夫</option><option value="妻">妻</option></select>
         <label>合計金額:</label><input type="number" id="editTotal">
@@ -75,73 +94,153 @@
     </dialog>
 
     <script>
+        let allData = [];
+        // ジャンルから通信費を削除した4種類
+        const genres = ['食料品、日用品', '外食費', '旅費', 'その他'];
+
+        // 日付から「25日締め」の月度を計算する関数
+        function getPeriod(dateString) {
+            const d = new Date(dateString);
+            if (isNaN(d)) return "不明";
+            let y = d.getFullYear();
+            let m = d.getMonth() + 1;
+            let date = d.getDate();
+            
+            // 26日以降なら翌月扱い
+            if (date >= 26) {
+                m += 1;
+                if (m > 12) { m = 1; y += 1; }
+            }
+            const formattedMonth = m.toString().padStart(2, '0');
+            return `${y}年${formattedMonth}月度`;
+        }
+
         async function loadData() {
-            const res = await fetch('/api/summary');
-            const data = await res.json();
-            const tbody = document.getElementById('expenseList');
-            tbody.innerHTML = '';
+            try {
+                const res = await fetch('/api/summary');
+                allData = await res.json();
+                
+                allData.forEach(row => { row.period = getPeriod(row.date); });
+
+                const periods = [...new Set(allData.map(row => row.period).filter(p => p !== "不明"))].sort().reverse();
+                const select = document.getElementById('periodSelect');
+                select.innerHTML = '';
+                
+                if(periods.length === 0) periods.push(getPeriod(new Date()));
+
+                periods.forEach(p => {
+                    const option = document.createElement('option');
+                    option.value = p;
+                    const [year, monthStr] = p.replace('月度', '').split('年');
+                    const month = parseInt(monthStr);
+                    const prevMonth = month === 1 ? 12 : month - 1;
+                    option.text = `${year}年${month}月度 (${prevMonth}/26〜${month}/25)`;
+                    select.appendChild(option);
+                });
+
+                renderDashboard();
+            } catch (error) {
+                alert("データの読み込みに失敗しました。");
+            }
+        }
+
+        function renderDashboard() {
+            const selectedPeriod = document.getElementById('periodSelect').value;
+            const filteredData = allData.filter(row => row.period === selectedPeriod);
 
             let husbandBalance = 0;
             let wifeBalance = 0;
+            let totalSummary = { '食料品、日用品': 0, '外食費': 0, '旅費': 0, 'その他': 0 };
+            let grandTotal = 0;
 
-            data.forEach(row => {
-                const tr = document.createElement('tr');
-                if (row.is_settled === 1) tr.classList.add('settled-row');
+            const detailsPanel = document.getElementById('detailsPanel');
+            detailsPanel.innerHTML = '';
+
+            // ジャンルごとのテーブル作成
+            genres.forEach(genre => {
+                const genreData = filteredData.filter(row => (row.genre || 'その他') === genre);
                 
-                const dateObj = new Date(row.date);
-                const dateStr = isNaN(dateObj) ? row.date : dateObj.toLocaleDateString('ja-JP');
-                const checkboxHtml = row.is_settled === 1 ? '済' : `<input type="checkbox" class="settle-check" value="${row.id}">`;
-                const genreText = row.genre || 'その他';
+                let tbodyHtml = '';
+                genreData.forEach(row => {
+                    const dateObj = new Date(row.date);
+                    const dateStr = isNaN(dateObj) ? row.date : `${dateObj.getMonth()+1}/${dateObj.getDate()}`;
+                    const checkboxHtml = row.is_settled === 1 ? '済' : `<input type="checkbox" class="settle-check" value="${row.id}">`;
+                    const imageHtml = row.image_id ? `<a href="/api/image?id=${row.image_id}" target="_blank" class="image-link" title="画像">🖼️</a>` : '';
+                    const rowClass = row.is_settled === 1 ? 'settled-row' : '';
 
-                // 画像IDがあれば「🖼️ 見る」ボタンを表示、なければ「-」
-                const imageHtml = row.image_id ? `<a href="/api/image?id=${row.image_id}" target="_blank" class="image-link" title="レシート画像を開く">🖼️ 見る</a>` : '-';
+                    tbodyHtml += `
+                        <tr class="${rowClass}">
+                            <td style="text-align:center;">${checkboxHtml}</td>
+                            <td>${dateStr}</td>
+                            <td>${row.description} ${imageHtml}</td>
+                            <td>${row.payer}</td>
+                            <td>${row.total_amount}</td>
+                            <td>${row.husband_burden}</td>
+                            <td>${row.wife_burden}</td>
+                            <td>
+                                <button class="action-btn" style="padding:2px 4px; font-size:0.8em;" onclick='openEdit(${JSON.stringify(row).replace(/'/g, "&apos;")})'>編</button>
+                                <button class="action-btn" style="padding:2px 4px; font-size:0.8em; background:#d9534f;" onclick="deleteRecord(${row.id})">削</button>
+                            </td>
+                        </tr>
+                    `;
 
-                tr.innerHTML = `
-                    <td style="text-align:center;">${checkboxHtml}</td>
-                    <td>${dateStr}</td>
-                    <td style="text-align:center;">${imageHtml}</td>
-                    <td><span class="genre-badge">${genreText}</span></td>
-                    <td>${row.description}</td>
-                    <td>${row.payer}</td>
-                    <td>${row.total_amount}</td>
-                    <td>${row.husband_burden}</td>
-                    <td>${row.wife_burden}</td>
-                    <td>
-                        <button class="action-btn" style="padding:4px; font-size:0.8em;" onclick='openEdit(${JSON.stringify(row)})'>編集</button>
-                        <button class="action-btn" style="padding:4px; font-size:0.8em; background:#d9534f;" onclick="deleteRecord(${row.id})">削除</button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-
-                if (row.is_settled === 0) {
+                    // 集計計算（未精算のみ立替計算に含める）
                     const total = Number(row.total_amount) || 0;
-                    const hBurden = Number(row.husband_burden) || 0;
-                    const wBurden = Number(row.wife_burden) || 0;
-                    const payer = String(row.payer).trim();
+                    totalSummary[genre] += total;
+                    grandTotal += total;
 
-                    if (payer === '夫') {
-                        husbandBalance += (total - hBurden);
-                        wifeBalance -= wBurden;
-                    } else if (payer === '妻') {
-                        wifeBalance += (total - wBurden);
-                        husbandBalance -= hBurden;
+                    if (row.is_settled === 0) {
+                        const hBurden = Number(row.husband_burden) || 0;
+                        const wBurden = Number(row.wife_burden) || 0;
+                        const payer = String(row.payer).trim();
+
+                        if (payer === '夫') {
+                            husbandBalance += (total - hBurden);
+                            wifeBalance -= wBurden;
+                        } else if (payer === '妻') {
+                            wifeBalance += (total - wBurden);
+                            husbandBalance -= hBurden;
+                        }
                     }
-                }
+                });
+
+                // ジャンルごとのパネルHTML
+                const tableHtml = `
+                    <div class="genre-table-container">
+                        <h3>${genre}</h3>
+                        <table class="detail-table">
+                            <thead>
+                                <tr>
+                                    <th>精算</th><th>日付</th><th>備考</th><th>支払</th><th>合計</th><th>夫負担</th><th>妻負担</th><th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>${tbodyHtml || '<tr><td colspan="8" style="text-align:center;">データなし</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                `;
+                detailsPanel.insertAdjacentHTML('beforeend', tableHtml);
             });
 
+            // 左側のサマリー表を更新
+            const summaryTbody = document.getElementById('summaryTbody');
+            summaryTbody.innerHTML = '';
+            genres.forEach(genre => {
+                summaryTbody.insertAdjacentHTML('beforeend', `<tr><td>${genre}</td><td>${totalSummary[genre].toLocaleString()}円</td></tr>`);
+            });
+            summaryTbody.insertAdjacentHTML('beforeend', `<tr class="total-row"><td>合計</td><td>${grandTotal.toLocaleString()}円</td></tr>`);
+
+            // 立替状況の更新
             const finalHusbandReceive = husbandBalance > 0 ? husbandBalance : 0;
             const finalWifeReceive = wifeBalance > 0 ? wifeBalance : 0;
 
-            let settlementText = "現在、精算の必要はありません（負担はピッタリです）。";
-            if (finalHusbandReceive > 0) settlementText = `現在、<strong>妻</strong> から <strong>夫</strong> へ <span class="amount">${finalHusbandReceive}円</span> 支払うと精算完了です。`;
-            if (finalWifeReceive > 0) settlementText = `現在、<strong>夫</strong> から <strong>妻</strong> へ <span class="amount">${finalWifeReceive}円</span> 支払うと精算完了です。`;
+            document.getElementById('husbandBal').textContent = finalHusbandReceive.toLocaleString();
+            document.getElementById('wifeBal').textContent = finalWifeReceive.toLocaleString();
 
-            document.getElementById('summaryBox').innerHTML = `
-                <p>・夫が立て替えている額（未精算）: ${finalHusbandReceive}円</p>
-                <p>・妻が立て替えている額（未精算）: ${finalWifeReceive}円</p>
-                <hr style="border:0; border-top:1px dashed #ccc; margin: 15px 0;">
-                <p>${settlementText}</p>
-            `;
+            let settlementText = "現在、精算の必要はありません。";
+            if (finalHusbandReceive > 0) settlementText = `<strong>妻</strong> から <strong>夫</strong> へ <br><span class="amount">${finalHusbandReceive.toLocaleString()}円</span> 支払うと精算完了です。`;
+            if (finalWifeReceive > 0) settlementText = `<strong>夫</strong> から <strong>妻</strong> へ <br><span class="amount">${finalWifeReceive.toLocaleString()}円</span> 支払うと精算完了です。`;
+            
+            document.getElementById('settlementText').innerHTML = settlementText;
         }
 
         async function deleteRecord(id) {
@@ -186,10 +285,12 @@
             const ids = Array.from(checkboxes).map(cb => Number(cb.value));
             if(ids.length === 0) { alert("精算済みにする項目にチェックを入れてください。"); return; }
             if(!confirm("選択した項目を「精算済み」にします。よろしいですか？")) return;
+            
             await fetch('/api/manage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'settle', ids: ids }) });
             loadData();
         }
 
+        // 初期読み込み
         loadData();
     </script>
 </body>

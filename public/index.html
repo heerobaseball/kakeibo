@@ -63,7 +63,7 @@
         
         dropZone.addEventListener('click', () => imageInput.click());
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
         
         function updateFileDisplay(files) {
             if (files.length === 0) {
@@ -145,7 +145,6 @@
             const files = imageInput.files; 
             
             if (files.length === 0) { alert("画像を選択してください"); return; }
-            // ここで最大5枚に制限しています
             if (files.length > 5) { alert("一度に処理できるのは最大5枚までです。\nお手数ですが5枚以下に分けて登録してください。"); return; }
 
             const submitBtn = document.getElementById('submitBtn');
