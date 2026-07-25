@@ -137,23 +137,40 @@
                 statusDiv.innerHTML = `<strong>${originalFile ? originalFile.name : 'テキスト入力'}</strong><br>⏳ AI解析の準備中...`;
                 
                 const configRes = await fetch('/api/config');
-                if (!configRes.ok) throw new Error("サーバー設定の取得に失敗しました (404/500)");
-                const configData = await configRes.json();
+                const configText = await configRes.text();
+                let configData;
+                try {
+                    configData = JSON.parse(configText);
+                } catch (e) {
+                    throw new Error(`/api/config から予期せぬ応答が返りました: ${configText.substring(0, 100)}`);
+                }
                 if (!configData.apiKey) throw new Error("GEMINI_API_KEY が設定されていません。Cloudflareの環境変数をご確認ください。");
 
                 statusDiv.innerHTML = `<strong>${originalFile ? originalFile.name : 'テキスト入力'}</strong><br>🧠 Geminiが解析中...`;
                 
                 const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${configData.apiKey}`;
                 const geminiRes = await fetch(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: contentsArray }] }) });
-                const geminiData = await geminiRes.json();
-                
+                const geminiText = await geminiRes.text();
+                let geminiData;
+                try {
+                    geminiData = JSON.parse(geminiText);
+                } catch(e) {
+                    throw new Error(`Gemini API から予期せぬ応答が返りました: ${geminiText.substring(0, 100)}`);
+                }
+
                 if (!geminiRes.ok) {
                     if(geminiData.error?.code === 429) throw new Error('APIの制限回数を超えました。少し待ってから再度お試しください。');
                     throw new Error(`Googleエラー: ${geminiData.error?.message || '詳細不明'}`);
                 }
                 
-                let resultText = geminiData.candidates[0].content.parts[0].text.replace(/```json\n|\n```/g, '');
-                const parsedData = JSON.parse(resultText);
+                let rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                let cleanedJsonText = rawText.replace(/```json\s*|```/g, '').trim();
+                let parsedData;
+                try {
+                    parsedData = JSON.parse(cleanedJsonText);
+                } catch(e) {
+                    throw new Error(`Gemini の解析結果 JSON パースに失敗しました: ${rawText.substring(0, 100)}`);
+                }
 
                 statusDiv.innerHTML = `<strong>${originalFile ? originalFile.name : 'テキスト入力'}</strong><br>💾 データを保存中...`;
                 
@@ -162,7 +179,13 @@
                 if (originalFile) formData.append('image', originalFile);
 
                 const saveRes = await fetch('/api/upload', { method: 'POST', body: formData });
-                const saveData = await saveRes.json();
+                const saveText = await saveRes.text();
+                let saveData;
+                try {
+                    saveData = JSON.parse(saveText);
+                } catch(e) {
+                    throw new Error(`/api/upload 保存エラー: ${saveText.substring(0, 150)}`);
+                }
                 
                 if(saveData.success) {
                     statusDiv.innerHTML = `<strong>${originalFile ? originalFile.name : 'テキスト入力'}</strong><br><span style="color:green;">✅ 登録完了!</span><br>決済日: ${saveData.data.date} / 内容: [${saveData.data.genre}] ${saveData.data.description} / 合計: ${saveData.data.total_amount}円`;
@@ -172,6 +195,7 @@
                     throw new Error(saveData.error); 
                 }
             } catch (err) { 
+                console.error("AI Process Error:", err);
                 statusDiv.innerHTML = `<strong>${originalFile ? originalFile.name : 'テキスト入力'}</strong><br><span style="color:red;">❌ エラーが発生しました: ${err.message}</span>`; 
                 statusDiv.style.backgroundColor = "#ffebee";
                 statusDiv.style.borderColor = "#ffcdd2";
