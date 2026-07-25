@@ -364,6 +364,9 @@
             if (e.dataTransfer.files.length) { galleryInput.files = e.dataTransfer.files; cameraInput.value = ''; updateFileDisplay(galleryInput.files); }
         });
 
+        // -------- Helper delay --------
+        const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
         // -------- AI Prompt --------
         const todayStr  = new Date().toLocaleDateString('ja-JP');
         const basePrompt = `本日は ${todayStr} です。以下の情報を解析し、指定されたJSONフォーマットで出力してください。JSON以外のテキストは絶対に含めないでください。
@@ -387,18 +390,34 @@
                 catch { throw new Error(`/api/config から予期せぬ応答: ${configText.substring(0, 80)}`); }
                 if (!configData.apiKey) throw new Error('GEMINI_API_KEY が未設定です。Cloudflare 環境変数をご確認ください。');
 
-                statusDiv.innerHTML = `<span class="spinner"></span><strong>${label}</strong> — Gemini AI が解析中...`;
-
                 const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${configData.apiKey}`;
-                const geminiRes  = await fetch(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: contentsArray }] }) });
-                const geminiText = await geminiRes.text();
-                let geminiData;
-                try { geminiData = JSON.parse(geminiText); }
-                catch { throw new Error(`Gemini API から予期せぬ応答: ${geminiText.substring(0, 80)}`); }
+                
+                // --- Retry loop for 429 Rate Limit ---
+                let geminiData = null;
+                let maxRetries = 4;
+                for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                    statusDiv.innerHTML = `<span class="spinner"></span><strong>${label}</strong> — Gemini AI が解析中...${attempt > 1 ? ` (リトライ ${attempt-1}/${maxRetries-1})` : ''}`;
 
-                if (!geminiRes.ok) {
-                    if (geminiData.error?.code === 429) throw new Error('API 制限に達しました。しばらく待ってから再試行してください。');
-                    throw new Error(`Google API エラー: ${geminiData.error?.message || '詳細不明'}`);
+                    const geminiRes  = await fetch(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: contentsArray }] }) });
+                    const geminiText = await geminiRes.text();
+                    try { geminiData = JSON.parse(geminiText); }
+                    catch { throw new Error(`Gemini API から予期せぬ応答: ${geminiText.substring(0, 80)}`); }
+
+                    if (geminiRes.ok) {
+                        break;
+                    }
+
+                    if (geminiRes.status === 429 || geminiData.error?.code === 429) {
+                        if (attempt < maxRetries) {
+                            const waitSec = attempt * 4;
+                            statusDiv.innerHTML = `<span class="spinner"></span><strong>${label}</strong> — ⏳ API制限回避のため ${waitSec}秒待機して再試行中...`;
+                            await delay(waitSec * 1000);
+                            continue;
+                        }
+                        throw new Error('API制限回数を超えました。しばらく待ってから再試行してください。');
+                    } else {
+                        throw new Error(`Google API エラー: ${geminiData.error?.message || '詳細不明'}`);
+                    }
                 }
 
                 const rawText       = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -447,7 +466,12 @@
             resultArea.innerHTML = '';
             const comment = document.getElementById('commentInputImage').value;
 
-            for (const file of files) {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (i > 0) {
+                    await delay(2000);
+                }
+
                 const statusDiv = document.createElement('div');
                 statusDiv.className = 'result-item';
                 statusDiv.innerHTML = `<strong>${file.name}</strong> — 順番待ち...`;
