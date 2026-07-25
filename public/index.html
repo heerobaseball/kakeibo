@@ -136,12 +136,14 @@
             try {
                 statusDiv.innerHTML = `<strong>${originalFile ? originalFile.name : 'テキスト入力'}</strong><br>⏳ AI解析の準備中...`;
                 
-                const configRes = await fetch('/api/config'); const configData = await configRes.json();
-                if (!configData.apiKey) throw new Error("APIキーが取得できません。");
+                const configRes = await fetch('/api/config');
+                if (!configRes.ok) throw new Error("サーバー設定の取得に失敗しました (404/500)");
+                const configData = await configRes.json();
+                if (!configData.apiKey) throw new Error("GEMINI_API_KEY が設定されていません。Cloudflareの環境変数をご確認ください。");
 
                 statusDiv.innerHTML = `<strong>${originalFile ? originalFile.name : 'テキスト入力'}</strong><br>🧠 Geminiが解析中...`;
                 
-                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${configData.apiKey}`;
+                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${configData.apiKey}`;
                 const geminiRes = await fetch(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: contentsArray }] }) });
                 const geminiData = await geminiRes.json();
                 
