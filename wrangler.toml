@@ -9,7 +9,7 @@ directory = "./public"
 [[d1_databases]]
 binding = "DB"
 database_name = "kakeibo-db"
-database_id = "<YOUR_D1_DATABASE_ID>"
+database_id = "76cdb8e6-15a7-473a-a87a-4132c98238e0"
 
 [[r2_buckets]]
 binding = "RECEIPT_BUCKET"
