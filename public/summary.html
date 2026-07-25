@@ -3,305 +3,637 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>集計結果 - ふたりの家計簿</title>
+    <title>集計・履歴 | ふたりの家計簿</title>
+    <meta name="description" content="夫婦の月次支出を一覧管理。ジャンル別の内訳と精算額を自動計算します。">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; padding: 15px; margin: 0; color: #333; background-color: #f8f9fa; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        a.button, button.action-btn { background-color: #6c757d; color: white; border: none; padding: 6px 10px; border-radius: 5px; cursor: pointer; text-decoration: none; font-size: 0.9em; }
-        button.settle-btn { background-color: #28a745; margin-top: 10px; width: 100%; padding: 10px; font-weight: bold; }
-        
-        .month-selector { font-size: 1.2em; font-weight: bold; padding: 8px; border-radius: 5px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
-
-        .dashboard { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
-        
-        .summary-panel { flex: 0 0 320px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); box-sizing: border-box; }
-        .summary-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 0.9em; }
-        .summary-table th, .summary-table td { border: 1px solid #ddd; padding: 8px; text-align: right; }
-        .summary-table th { background-color: #f4f4f4; text-align: left; }
-        .amount { font-size: 1.2em; font-weight: bold; color: #d9534f; }
-        .total-row { background-color: #e9ecef; font-weight: bold; }
-
-        .details-panel { flex: 1; display: flex; gap: 15px; overflow-x: auto; padding-bottom: 15px; box-sizing: border-box; }
-        .genre-table-container { min-width: 450px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); box-sizing: border-box; }
-        .genre-table-container h3 { margin-top: 0; padding-bottom: 5px; border-bottom: 2px solid #007bff; font-size: 1.1em; color: #007bff; }
-        
-        table.detail-table { width: 100%; border-collapse: collapse; font-size: 0.8em; }
-        table.detail-table th, table.detail-table td { border: 1px solid #ddd; padding: 6px; text-align: left; }
-        table.detail-table th { background-color: #f4f4f4; white-space: nowrap; }
-        .settled-row { background-color: #f8f9fa; color: #aaa; text-decoration: line-through; }
-        .image-link { display: inline-block; padding: 2px 5px; background-color: #17a2b8; color: white; border-radius: 3px; text-decoration: none; font-size: 0.8em; }
-
-        dialog { padding: 20px; border-radius: 8px; border: 1px solid #ccc; width: 90%; max-width: 400px; }
-        dialog input, dialog select { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
-
-        /* =========================================
-           📱 スマホ向けレスポンシブデザイン（追加部分）
-           ========================================= */
-        @media (max-width: 768px) {
-            .header { flex-direction: column; align-items: stretch; gap: 15px; }
-            .header > a { text-align: center; padding: 12px; font-weight: bold; }
-            
-            .dashboard { flex-direction: column; }
-            
-            /* サマリーパネルを画面幅いっぱいに */
-            .summary-panel { flex: none; width: 100%; }
-            
-            /* ジャンル別の表を縦並びに変更 */
-            .details-panel { flex-direction: column; width: 100%; overflow-x: hidden; }
-            .genre-table-container { min-width: 100%; width: 100%; }
-            
-            /* テーブルがスマホ画面より大きい場合は、枠内だけで横スクロールさせる */
-            table.detail-table { min-width: 450px; }
+        :root {
+            --bg: #0f172a;
+            --bg2: #1e293b;
+            --surface: rgba(255,255,255,0.05);
+            --surface-hover: rgba(255,255,255,0.08);
+            --border: rgba(255,255,255,0.1);
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --accent1: #6366f1;
+            --accent2: #06b6d4;
+            --grad: linear-gradient(135deg, #6366f1, #06b6d4);
+            --success: #10b981;
+            --danger: #ef4444;
+            --warn: #f59e0b;
+            --radius: 16px;
+            --radius-sm: 10px;
         }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ====== HEADER ====== */
+        .app-header {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 40%, #06b6d4 100%);
+            padding: 20px 20px 70px;
+            position: relative;
+            overflow: hidden;
+        }
+        .app-header::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+        .header-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            position: relative;
+        }
+        .header-left h1 { font-size: 1.4em; font-weight: 700; color: #fff; }
+        .header-left p  { font-size: 0.75em; color: rgba(255,255,255,0.7); margin-top: 2px; }
+        .nav-link {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.25);
+            color: #fff;
+            padding: 8px 14px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-size: 0.8em;
+            font-weight: 500;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        .nav-link:hover { background: rgba(255,255,255,0.25); }
+
+        /* ====== PERIOD SELECTOR ====== */
+        .period-bar {
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .period-bar select {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            padding: 8px 12px;
+            font-size: 0.88em;
+            font-family: 'Noto Sans JP', sans-serif;
+            cursor: pointer;
+            outline: none;
+            width: 100%;
+            max-width: 300px;
+        }
+        .period-bar select:focus { border-color: var(--accent1); }
+        .period-bar select option { background: var(--bg2); }
+
+        /* ====== MAIN LAYOUT ====== */
+        .main-wrapper { max-width: 1100px; margin: 0 auto; padding: 20px 16px 40px; }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+        @media (max-width: 768px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ====== CARD ====== */
+        .card {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        .card-title {
+            font-size: 0.8em;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* ====== STAT CARDS (summary cards pulled up over header) ====== */
+        .stat-cards {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin: -50px 16px 20px;
+            position: relative;
+            z-index: 10;
+            max-width: 1100px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .stat-card {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+        }
+        .stat-card .label { font-size: 0.72em; color: var(--text-muted); margin-bottom: 4px; }
+        .stat-card .value { font-size: 1.5em; font-weight: 700; background: var(--grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .stat-card .sub   { font-size: 0.72em; color: var(--text-muted); margin-top: 2px; }
+
+        /* ====== SUMMARY TABLE ====== */
+        .summary-table { width: 100%; border-collapse: collapse; font-size: 0.85em; margin-bottom: 16px; }
+        .summary-table th { color: var(--text-muted); font-weight: 500; font-size: 0.75em; text-align: left; padding: 6px 4px; letter-spacing: 0.04em; }
+        .summary-table td { padding: 8px 4px; border-top: 1px solid var(--border); }
+        .summary-table td:last-child { text-align: right; font-weight: 600; }
+        .summary-table .total-row td { color: var(--accent2); font-size: 1.05em; font-weight: 700; }
+
+        /* ====== SETTLEMENT BOX ====== */
+        .settlement-box {
+            background: rgba(99,102,241,0.1);
+            border: 1px solid rgba(99,102,241,0.3);
+            border-radius: var(--radius-sm);
+            padding: 14px;
+            margin-bottom: 14px;
+            font-size: 0.85em;
+            line-height: 1.8;
+        }
+        .settlement-box .settlement-title { font-size: 0.7em; font-weight: 700; letter-spacing: 0.08em; color: var(--accent1); text-transform: uppercase; margin-bottom: 8px; }
+        .balance-row { display: flex; justify-content: space-between; align-items: center; }
+        .balance-row span:last-child { font-weight: 700; color: var(--accent2); }
+        .settlement-result {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed var(--border);
+            font-weight: 500;
+            font-size: 0.9em;
+        }
+        .settlement-result strong { color: var(--warn); font-size: 1.2em; }
+        .settlement-result.ok { color: var(--success); }
+
+        /* ====== SETTLE BUTTON ====== */
+        .btn-settle {
+            width: 100%;
+            padding: 11px;
+            border: none;
+            border-radius: var(--radius-sm);
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #fff;
+            font-size: 0.85em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Noto Sans JP', sans-serif;
+            box-shadow: 0 4px 14px rgba(16,185,129,0.3);
+        }
+        .btn-settle:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+        /* ====== GENRE SECTIONS ====== */
+        .genre-sections { display: flex; flex-direction: column; gap: 16px; }
+
+        .genre-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+        .genre-card-header {
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            user-select: none;
+        }
+        .genre-card-header:hover { background: var(--surface-hover); }
+        .genre-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 600;
+            font-size: 0.88em;
+        }
+        .genre-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .genre-total { font-size: 0.82em; color: var(--text-muted); }
+        .genre-toggle { color: var(--text-muted); font-size: 0.8em; transition: transform 0.2s; }
+        .genre-toggle.open { transform: rotate(180deg); }
+
+        .genre-card-body { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .genre-card-body.collapsed { display: none; }
+
+        table.detail-table { width: 100%; border-collapse: collapse; font-size: 0.8em; min-width: 520px; }
+        table.detail-table th {
+            background: rgba(0,0,0,0.2);
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.72em;
+            letter-spacing: 0.05em;
+            padding: 8px 10px;
+            text-align: left;
+            white-space: nowrap;
+        }
+        table.detail-table td { padding: 9px 10px; border-top: 1px solid var(--border); vertical-align: middle; }
+        table.detail-table tr:hover td { background: var(--surface); }
+        .settled-row td { color: var(--text-muted); text-decoration: line-through; opacity: 0.55; }
+        .empty-row { text-align: center; color: var(--text-muted); font-size: 0.82em; padding: 20px; }
+
+        /* ====== INLINE ELEMENTS ====== */
+        .image-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px; height: 22px;
+            background: rgba(6,182,212,0.15);
+            border: 1px solid rgba(6,182,212,0.3);
+            border-radius: 5px;
+            color: var(--accent2);
+            text-decoration: none;
+            font-size: 0.85em;
+            transition: background 0.2s;
+        }
+        .image-link:hover { background: rgba(6,182,212,0.3); }
+
+        .check-input { accent-color: var(--accent1); width: 15px; height: 15px; cursor: pointer; }
+
+        /* ====== ACTION BUTTONS ====== */
+        .btn-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px; height: 26px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.75em;
+            transition: all 0.2s;
+        }
+        .btn-edit   { background: rgba(99,102,241,0.15); color: var(--accent1); border: 1px solid rgba(99,102,241,0.3); }
+        .btn-delete { background: rgba(239,68,68,0.12);  color: var(--danger);  border: 1px solid rgba(239,68,68,0.3); }
+        .btn-edit:hover   { background: rgba(99,102,241,0.3); }
+        .btn-delete:hover { background: rgba(239,68,68,0.25); }
+
+        /* ====== MODAL ====== */
+        dialog {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 28px;
+            width: 90%;
+            max-width: 420px;
+            color: var(--text);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        }
+        dialog::backdrop { background: rgba(0,0,0,0.65); backdrop-filter: blur(4px); }
+        dialog h3 { font-size: 1em; font-weight: 700; margin-bottom: 20px; background: var(--grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+        .modal-field { margin-bottom: 14px; }
+        .modal-field label { display: block; font-size: 0.74em; color: var(--text-muted); font-weight: 500; margin-bottom: 5px; letter-spacing: 0.03em; }
+        .modal-field input,
+        .modal-field select {
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            padding: 10px 12px;
+            font-size: 0.88em;
+            font-family: 'Noto Sans JP', sans-serif;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .modal-field input:focus, .modal-field select:focus { border-color: var(--accent1); }
+        .modal-field select option { background: var(--bg2); }
+
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .btn-modal-cancel {
+            padding: 9px 18px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-family: 'Noto Sans JP', sans-serif;
+            font-size: 0.85em;
+            transition: all 0.2s;
+        }
+        .btn-modal-cancel:hover { background: var(--surface); }
+        .btn-modal-save {
+            padding: 9px 20px;
+            border: none;
+            background: var(--grad);
+            color: #fff;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-family: 'Noto Sans JP', sans-serif;
+            font-size: 0.85em;
+            font-weight: 700;
+            transition: all 0.2s;
+        }
+        .btn-modal-save:hover { filter: brightness(1.1); }
+
+        /* ====== GENRE COLORS ====== */
+        .dot-food    { background: #10b981; }
+        .dot-eat     { background: #f59e0b; }
+        .dot-travel  { background: #6366f1; }
+        .dot-other   { background: #94a3b8; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <a href="/" class="button">← レシート登録に戻る</a>
-        <div>
-            <label for="periodSelect" style="display:block; margin-bottom:5px;">表示月度:</label>
-            <select id="periodSelect" class="month-selector" onchange="renderDashboard()"></select>
+    <header class="app-header">
+        <div class="header-inner">
+            <div class="header-left">
+                <h1>📊 集計・履歴</h1>
+                <p>ふたりの家計簿 ダッシュボード</p>
+            </div>
+            <a href="/" class="nav-link">← 登録に戻る</a>
+        </div>
+    </header>
+
+    <!-- Stat Cards (overlap header) -->
+    <div class="stat-cards" id="statCards">
+        <div class="stat-card">
+            <div class="label">今月の支出合計</div>
+            <div class="value" id="statTotal">¥—</div>
+            <div class="sub">未精算を含む</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">精算が必要な金額</div>
+            <div class="value" id="statSettle">¥—</div>
+            <div class="sub" id="statSettleDir">—</div>
         </div>
     </div>
-    
-    <div class="dashboard">
-        <div class="summary-panel">
-            <h2>💸 月次サマリー</h2>
-            <table class="summary-table">
-                <thead>
-                    <tr><th>ジャンル</th><th>合計金額</th></tr>
-                </thead>
-                <tbody id="summaryTbody">
-                    </tbody>
-            </table>
 
-            <div style="background-color: #e9ecef; padding: 15px; border-radius: 8px; line-height: 1.6;">
-                <strong>【未精算分の立替状況】</strong>
-                <p style="margin: 5px 0; font-size:0.9em;">夫の立替額: <span id="husbandBal">0</span>円</p>
-                <p style="margin: 5px 0; font-size:0.9em;">妻の立替額: <span id="wifeBal">0</span>円</p>
-                <hr style="border:0; border-top:1px dashed #ccc; margin: 10px 0;">
-                <p id="settlementText" style="margin: 0;">データを計算中...</p>
-            </div>
-            
-            <button class="action-btn settle-btn" onclick="settleSelected()">☑ 選択した項目を「精算済み」にする</button>
-        </div>
-
-        <div class="details-panel" id="detailsPanel">
-            </div>
+    <!-- Period selector -->
+    <div class="period-bar">
+        <select id="periodSelect" onchange="renderDashboard()"></select>
     </div>
 
+    <div class="main-wrapper">
+        <div class="dashboard-grid">
+            <!-- Left: Summary -->
+            <aside>
+                <div class="card">
+                    <div class="card-title">📋 月次サマリー</div>
+                    <table class="summary-table">
+                        <thead><tr><th>ジャンル</th><th style="text-align:right;">合計</th></tr></thead>
+                        <tbody id="summaryTbody"></tbody>
+                    </table>
+
+                    <div class="settlement-box">
+                        <div class="settlement-title">🔄 未精算の立替状況</div>
+                        <div class="balance-row"><span>夫の立替額</span><span id="husbandBal">¥0</span></div>
+                        <div class="balance-row"><span>妻の立替額</span><span id="wifeBal">¥0</span></div>
+                        <div class="settlement-result" id="settlementText">計算中...</div>
+                    </div>
+
+                    <button class="btn-settle" onclick="settleSelected()">✅ 選択した項目を精算済みにする</button>
+                </div>
+            </aside>
+
+            <!-- Right: Detail tables -->
+            <section class="genre-sections" id="detailsPanel"></section>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
     <dialog id="editModal">
-        <h3>内容の編集</h3>
+        <h3>✏️ 内容の編集</h3>
         <input type="hidden" id="editId">
-        <label>決済日:</label><input type="date" id="editDate">
-        <label>ジャンル:</label>
-        <select id="editGenre">
-            <option value="食料品、日用品">食料品、日用品</option>
-            <option value="外食費">外食費</option>
-            <option value="旅費">旅費</option>
-            <option value="その他">その他</option>
-        </select>
-        <label>備考(内容):</label><input type="text" id="editDesc">
-        <label>支払った人:</label>
-        <select id="editPayer"><option value="夫">夫</option><option value="妻">妻</option></select>
-        <label>合計金額:</label><input type="number" id="editTotal">
-        <label>夫の負担:</label><input type="number" id="editHusband">
-        <label>妻の負担:</label><input type="number" id="editWife">
-        <div style="text-align: right; margin-top: 10px;">
-            <button class="action-btn" onclick="document.getElementById('editModal').close()" style="background:#ccc;">キャンセル</button>
-            <button class="action-btn" onclick="saveEdit()" style="background:#007bff;">保存</button>
+        <div class="modal-field"><label>決済日</label><input type="date" id="editDate"></div>
+        <div class="modal-field">
+            <label>ジャンル</label>
+            <select id="editGenre">
+                <option value="食料品、日用品">食料品、日用品</option>
+                <option value="外食費">外食費</option>
+                <option value="旅費">旅費</option>
+                <option value="その他">その他</option>
+            </select>
+        </div>
+        <div class="modal-field"><label>備考（内容）</label><input type="text" id="editDesc"></div>
+        <div class="modal-field">
+            <label>支払った人</label>
+            <select id="editPayer"><option value="夫">夫</option><option value="妻">妻</option></select>
+        </div>
+        <div class="modal-field"><label>合計金額</label><input type="number" id="editTotal"></div>
+        <div class="modal-field"><label>夫の負担額</label><input type="number" id="editHusband"></div>
+        <div class="modal-field"><label>妻の負担額</label><input type="number" id="editWife"></div>
+        <div class="modal-actions">
+            <button class="btn-modal-cancel" onclick="document.getElementById('editModal').close()">キャンセル</button>
+            <button class="btn-modal-save"   onclick="saveEdit()">保存する</button>
         </div>
     </dialog>
 
     <script>
         let allData = [];
         const genres = ['食料品、日用品', '外食費', '旅費', 'その他'];
+        const genreDots  = { '食料品、日用品': 'dot-food', '外食費': 'dot-eat', '旅費': 'dot-travel', 'その他': 'dot-other' };
+        const genreIcons = { '食料品、日用品': '🛒', '外食費': '🍽️', '旅費': '✈️', 'その他': '📦' };
 
         function getPeriod(dateString) {
             const d = new Date(dateString);
-            if (isNaN(d)) return "不明";
-            let y = d.getFullYear();
-            let m = d.getMonth() + 1;
-            let date = d.getDate();
-            
-            if (date >= 26) {
-                m += 1;
-                if (m > 12) { m = 1; y += 1; }
-            }
-            const formattedMonth = m.toString().padStart(2, '0');
-            return `${y}年${formattedMonth}月度`;
+            if (isNaN(d)) return '不明';
+            let y = d.getFullYear(), m = d.getMonth() + 1;
+            if (d.getDate() >= 26) { m++; if (m > 12) { m = 1; y++; } }
+            return `${y}年${String(m).padStart(2,'0')}月度`;
         }
 
         async function loadData() {
             try {
                 const res = await fetch('/api/summary');
                 allData = await res.json();
-                
                 allData.forEach(row => { row.period = getPeriod(row.date); });
 
-                const periods = [...new Set(allData.map(row => row.period).filter(p => p !== "不明"))].sort().reverse();
+                const periods = [...new Set(allData.map(r => r.period).filter(p => p !== '不明'))].sort().reverse();
                 const select = document.getElementById('periodSelect');
                 select.innerHTML = '';
-                
-                if(periods.length === 0) periods.push(getPeriod(new Date()));
-
+                if (!periods.length) periods.push(getPeriod(new Date()));
                 periods.forEach(p => {
-                    const option = document.createElement('option');
-                    option.value = p;
-                    const [year, monthStr] = p.replace('月度', '').split('年');
-                    const month = parseInt(monthStr);
-                    const prevMonth = month === 1 ? 12 : month - 1;
-                    option.text = `${year}年${month}月度 (${prevMonth}/26〜${month}/25)`;
-                    select.appendChild(option);
+                    const opt = document.createElement('option');
+                    opt.value = p;
+                    const [year, ms] = p.replace('月度','').split('年');
+                    const mo = parseInt(ms);
+                    const prev = mo === 1 ? 12 : mo - 1;
+                    opt.text = `${year}年${mo}月度 （${prev}/26〜${mo}/25）`;
+                    select.appendChild(opt);
                 });
-
                 renderDashboard();
-            } catch (error) {
-                alert("データの読み込みに失敗しました。");
+            } catch {
+                alert('データの読み込みに失敗しました。');
             }
         }
 
         function renderDashboard() {
-            const selectedPeriod = document.getElementById('periodSelect').value;
-            const filteredData = allData.filter(row => row.period === selectedPeriod);
+            const selected    = document.getElementById('periodSelect').value;
+            const filtered    = allData.filter(r => r.period === selected);
+            const panel       = document.getElementById('detailsPanel');
+            const summaryBody = document.getElementById('summaryTbody');
+            panel.innerHTML = '';
+            summaryBody.innerHTML = '';
 
-            let husbandBalance = 0;
-            let wifeBalance = 0;
-            let totalSummary = { '食料品、日用品': 0, '外食費': 0, '旅費': 0, 'その他': 0 };
-            let grandTotal = 0;
-
-            const detailsPanel = document.getElementById('detailsPanel');
-            detailsPanel.innerHTML = '';
+            let husbandBalance = 0, wifeBalance = 0, grandTotal = 0;
+            const totalSummary = Object.fromEntries(genres.map(g => [g, 0]));
 
             genres.forEach(genre => {
-                const genreData = filteredData.filter(row => (row.genre || 'その他') === genre);
-                
-                let tbodyHtml = '';
-                genreData.forEach(row => {
-                    const dateObj = new Date(row.date);
-                    const dateStr = isNaN(dateObj) ? row.date : `${dateObj.getMonth()+1}/${dateObj.getDate()}`;
-                    const checkboxHtml = row.is_settled === 1 ? '済' : `<input type="checkbox" class="settle-check" value="${row.id}">`;
-                    const imageHtml = row.image_id ? `<a href="/api/image?id=${row.image_id}" target="_blank" class="image-link" title="画像">🖼️</a>` : '';
-                    const rowClass = row.is_settled === 1 ? 'settled-row' : '';
+                const rows = filtered.filter(r => (r.genre || 'その他') === genre);
 
-                    tbodyHtml += `
-                        <tr class="${rowClass}">
-                            <td style="text-align:center;">${checkboxHtml}</td>
-                            <td>${dateStr}</td>
-                            <td>${row.description} ${imageHtml}</td>
-                            <td>${row.payer}</td>
-                            <td>${row.total_amount}</td>
-                            <td>${row.husband_burden}</td>
-                            <td>${row.wife_burden}</td>
-                            <td>
-                                <button class="action-btn" style="padding:2px 4px; font-size:0.8em;" onclick='openEdit(${JSON.stringify(row).replace(/'/g, "&apos;")})'>編</button>
-                                <button class="action-btn" style="padding:2px 4px; font-size:0.8em; background:#d9534f;" onclick="deleteRecord(${row.id})">削</button>
-                            </td>
-                        </tr>
-                    `;
-
+                rows.forEach(row => {
                     const total = Number(row.total_amount) || 0;
                     totalSummary[genre] += total;
                     grandTotal += total;
-
                     if (row.is_settled === 0) {
-                        const hBurden = Number(row.husband_burden) || 0;
-                        const wBurden = Number(row.wife_burden) || 0;
+                        const hB = Number(row.husband_burden) || 0;
+                        const wB = Number(row.wife_burden)    || 0;
                         const payer = String(row.payer).trim();
-
-                        if (payer === '夫') {
-                            husbandBalance += (total - hBurden);
-                            wifeBalance -= wBurden;
-                        } else if (payer === '妻') {
-                            wifeBalance += (total - wBurden);
-                            husbandBalance -= hBurden;
-                        }
+                        if (payer === '夫') { husbandBalance += (total - hB); wifeBalance -= wB; }
+                        else if (payer === '妻') { wifeBalance += (total - wB); husbandBalance -= hB; }
                     }
                 });
 
-                /* スマホ用に横スクロール領域 (overflow-x: auto) を追加しています */
-                const tableHtml = `
-                    <div class="genre-table-container">
-                        <h3>${genre}</h3>
-                        <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                const tbodyHtml = rows.length
+                    ? rows.map(row => {
+                        const d = new Date(row.date);
+                        const ds = isNaN(d) ? row.date : `${d.getMonth()+1}/${d.getDate()}`;
+                        const checkHtml  = row.is_settled === 1 ? '<span style="color:var(--success);font-size:0.9em;">済</span>' : `<input type="checkbox" class="check-input settle-check" value="${row.id}">`;
+                        const imageHtml  = row.image_id ? `<a href="/api/image?id=${row.image_id}" target="_blank" class="image-link" title="レシート画像">🖼</a> ` : '';
+                        const rowClass   = row.is_settled === 1 ? 'settled-row' : '';
+                        const rowJson    = JSON.stringify(row).replace(/'/g, '&apos;');
+                        return `<tr class="${rowClass}">
+                            <td style="text-align:center;">${checkHtml}</td>
+                            <td style="white-space:nowrap;">${ds}</td>
+                            <td>${imageHtml}${row.description}</td>
+                            <td style="text-align:center;">${row.payer}</td>
+                            <td style="text-align:right;font-weight:600;">${Number(row.total_amount).toLocaleString()}</td>
+                            <td style="text-align:right;">${Number(row.husband_burden).toLocaleString()}</td>
+                            <td style="text-align:right;">${Number(row.wife_burden).toLocaleString()}</td>
+                            <td style="text-align:center;white-space:nowrap;">
+                                <button class="btn-icon btn-edit"   onclick='openEdit(${rowJson})' title="編集">✏</button>
+                                <button class="btn-icon btn-delete" onclick="deleteRecord(${row.id})" title="削除">🗑</button>
+                            </td>
+                        </tr>`;
+                    }).join('')
+                    : `<tr><td colspan="8" class="empty-row">この期間のデータはありません</td></tr>`;
+
+                const genreSubTotal = totalSummary[genre];
+                panel.insertAdjacentHTML('beforeend', `
+                    <div class="genre-card">
+                        <div class="genre-card-header" onclick="toggleGenre(this)">
+                            <span class="genre-badge">
+                                <span class="genre-dot ${genreDots[genre]}"></span>
+                                ${genreIcons[genre]} ${genre}
+                            </span>
+                            <span class="genre-total">${genreSubTotal.toLocaleString()}円 <span class="genre-toggle">▼</span></span>
+                        </div>
+                        <div class="genre-card-body">
                             <table class="detail-table">
                                 <thead>
                                     <tr>
-                                        <th>精算</th><th>日付</th><th>備考</th><th>支払</th><th>合計</th><th>夫負担</th><th>妻負担</th><th>操作</th>
+                                        <th>精算</th><th>日付</th><th>備考</th><th>支払</th>
+                                        <th style="text-align:right;">合計</th>
+                                        <th style="text-align:right;">夫負担</th>
+                                        <th style="text-align:right;">妻負担</th>
+                                        <th>操作</th>
                                     </tr>
                                 </thead>
-                                <tbody>${tbodyHtml || '<tr><td colspan="8" style="text-align:center;">データなし</td></tr>'}</tbody>
+                                <tbody>${tbodyHtml}</tbody>
                             </table>
                         </div>
-                    </div>
-                `;
-                detailsPanel.insertAdjacentHTML('beforeend', tableHtml);
+                    </div>`);
+
+                summaryBody.insertAdjacentHTML('beforeend',
+                    `<tr>
+                        <td><span class="genre-badge"><span class="genre-dot ${genreDots[genre]}"></span>${genreIcons[genre]} ${genre}</span></td>
+                        <td>${genreSubTotal.toLocaleString()}円</td>
+                    </tr>`);
             });
 
-            const summaryTbody = document.getElementById('summaryTbody');
-            summaryTbody.innerHTML = '';
-            genres.forEach(genre => {
-                summaryTbody.insertAdjacentHTML('beforeend', `<tr><td>${genre}</td><td>${totalSummary[genre].toLocaleString()}円</td></tr>`);
-            });
-            summaryTbody.insertAdjacentHTML('beforeend', `<tr class="total-row"><td>合計</td><td>${grandTotal.toLocaleString()}円</td></tr>`);
+            summaryBody.insertAdjacentHTML('beforeend',
+                `<tr class="total-row"><td style="font-weight:700;">合計</td><td>${grandTotal.toLocaleString()}円</td></tr>`);
 
-            const finalHusbandReceive = husbandBalance > 0 ? husbandBalance : 0;
-            const finalWifeReceive = wifeBalance > 0 ? wifeBalance : 0;
+            // Stat cards
+            document.getElementById('statTotal').textContent = `¥${grandTotal.toLocaleString()}`;
 
-            document.getElementById('husbandBal').textContent = finalHusbandReceive.toLocaleString();
-            document.getElementById('wifeBal').textContent = finalWifeReceive.toLocaleString();
+            const hR = Math.max(husbandBalance, 0);
+            const wR = Math.max(wifeBalance,    0);
+            document.getElementById('husbandBal').textContent = `¥${hR.toLocaleString()}`;
+            document.getElementById('wifeBal').textContent    = `¥${wR.toLocaleString()}`;
 
-            let settlementText = "現在、精算の必要はありません。";
-            if (finalHusbandReceive > 0) settlementText = `<strong>妻</strong> から <strong>夫</strong> へ <br><span class="amount">${finalHusbandReceive.toLocaleString()}円</span> 支払うと精算完了です。`;
-            if (finalWifeReceive > 0) settlementText = `<strong>夫</strong> から <strong>妻</strong> へ <br><span class="amount">${finalWifeReceive.toLocaleString()}円</span> 支払うと精算完了です。`;
-            
-            document.getElementById('settlementText').innerHTML = settlementText;
+            let stText = '', stClass = 'settlement-result ok', settleAmount = '¥0';
+            if (hR > 0) {
+                stText = `妻 → 夫 へ <strong>¥${hR.toLocaleString()}</strong> 支払いで精算完了`;
+                stClass = 'settlement-result';
+                settleAmount = `¥${hR.toLocaleString()}`;
+                document.getElementById('statSettleDir').textContent = '妻→夫';
+            } else if (wR > 0) {
+                stText = `夫 → 妻 へ <strong>¥${wR.toLocaleString()}</strong> 支払いで精算完了`;
+                stClass = 'settlement-result';
+                settleAmount = `¥${wR.toLocaleString()}`;
+                document.getElementById('statSettleDir').textContent = '夫→妻';
+            } else {
+                stText = '✅ 精算の必要はありません';
+                document.getElementById('statSettleDir').textContent = '精算不要';
+            }
+            document.getElementById('statSettle').textContent = settleAmount;
+            const stEl = document.getElementById('settlementText');
+            stEl.className = stClass;
+            stEl.innerHTML = stText;
+        }
+
+        function toggleGenre(header) {
+            const body   = header.nextElementSibling;
+            const toggle = header.querySelector('.genre-toggle');
+            body.classList.toggle('collapsed');
+            toggle.classList.toggle('open');
         }
 
         async function deleteRecord(id) {
-            if(!confirm("本当に削除しますか？")) return;
-            await fetch('/api/manage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'delete', id: id }) });
+            if (!confirm('本当に削除しますか？')) return;
+            await fetch('/api/manage', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'delete', id}) });
             loadData();
         }
 
         function openEdit(row) {
-            document.getElementById('editId').value = row.id;
-            let editDateStr = "";
-            if (row.date) editDateStr = String(row.date).substring(0, 10);
-            document.getElementById('editDate').value = editDateStr;
-            document.getElementById('editGenre').value = row.genre || 'その他';
-            document.getElementById('editDesc').value = row.description;
-            document.getElementById('editPayer').value = row.payer;
-            document.getElementById('editTotal').value = row.total_amount;
-            document.getElementById('editHusband').value = row.husband_burden;
-            document.getElementById('editWife').value = row.wife_burden;
+            document.getElementById('editId').value       = row.id;
+            document.getElementById('editDate').value     = String(row.date || '').substring(0,10);
+            document.getElementById('editGenre').value    = row.genre || 'その他';
+            document.getElementById('editDesc').value     = row.description;
+            document.getElementById('editPayer').value    = row.payer;
+            document.getElementById('editTotal').value    = row.total_amount;
+            document.getElementById('editHusband').value  = row.husband_burden;
+            document.getElementById('editWife').value     = row.wife_burden;
             document.getElementById('editModal').showModal();
         }
 
         async function saveEdit() {
             const data = {
                 action: 'update',
-                id: document.getElementById('editId').value,
-                date: document.getElementById('editDate').value,
-                genre: document.getElementById('editGenre').value,
-                description: document.getElementById('editDesc').value,
-                payer: document.getElementById('editPayer').value,
-                total_amount: Number(document.getElementById('editTotal').value),
-                husband_burden: Number(document.getElementById('editHusband').value),
-                wife_burden: Number(document.getElementById('editWife').value)
+                id:            document.getElementById('editId').value,
+                date:          document.getElementById('editDate').value,
+                genre:         document.getElementById('editGenre').value,
+                description:   document.getElementById('editDesc').value,
+                payer:         document.getElementById('editPayer').value,
+                total_amount:  Number(document.getElementById('editTotal').value),
+                husband_burden:Number(document.getElementById('editHusband').value),
+                wife_burden:   Number(document.getElementById('editWife').value)
             };
-            await fetch('/api/manage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+            await fetch('/api/manage', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
             document.getElementById('editModal').close();
             loadData();
         }
 
         async function settleSelected() {
-            const checkboxes = document.querySelectorAll('.settle-check:checked');
-            const ids = Array.from(checkboxes).map(cb => Number(cb.value));
-            if(ids.length === 0) { alert("精算済みにする項目にチェックを入れてください。"); return; }
-            if(!confirm("選択した項目を「精算済み」にします。よろしいですか？")) return;
-            
-            await fetch('/api/manage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'settle', ids: ids }) });
+            const ids = Array.from(document.querySelectorAll('.settle-check:checked')).map(cb => Number(cb.value));
+            if (!ids.length) { alert('精算済みにする項目にチェックを入れてください。'); return; }
+            if (!confirm(`選択した ${ids.length} 件を精算済みにします。よろしいですか？`)) return;
+            await fetch('/api/manage', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'settle', ids}) });
             loadData();
         }
 

@@ -3,127 +3,369 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ふたりの家計簿</title>
+    <title>ふたりの家計簿 | AI家計管理アプリ</title>
+    <meta name="description" content="AIがレシートを自動解析。夫婦の支出を賢く管理するスマート家計簿アプリ。">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; padding: 20px; max-width: 500px; margin: 0 auto; color: #333; }
-        input, textarea, button, select { width: 100%; margin-bottom: 15px; padding: 10px; box-sizing: border-box; }
-        button { background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 12px; font-weight: bold; }
-        button:hover { background-color: #0056b3; }
-        #dropZone { border: 2px dashed #007bff; border-radius: 5px; padding: 20px; text-align: center; background-color: #f8f9fa; margin-bottom: 15px; }
-        #dropZone.dragover { background-color: #e2e6ea; border-color: #0056b3; }
-        .tab-btn { background-color: #eee; color: #333; width: 48%; display: inline-block; margin-bottom: 10px; }
-        .tab-btn.active { background-color: #007bff; color: white; }
+        :root {
+            --bg: #0f172a;
+            --bg2: #1e293b;
+            --surface: rgba(255,255,255,0.05);
+            --surface-hover: rgba(255,255,255,0.09);
+            --border: rgba(255,255,255,0.1);
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --accent1: #6366f1;
+            --accent2: #06b6d4;
+            --grad: linear-gradient(135deg, #6366f1, #06b6d4);
+            --grad-soft: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(6,182,212,0.15));
+            --success: #10b981;
+            --danger: #ef4444;
+            --radius: 16px;
+            --radius-sm: 10px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding-bottom: 40px;
+        }
+
+        /* ====== HEADER ====== */
+        .app-header {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 40%, #06b6d4 100%);
+            padding: 20px 20px 60px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .app-header::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+        .app-header h1 {
+            font-size: 1.6em;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            color: #fff;
+            position: relative;
+        }
+        .app-header .subtitle {
+            font-size: 0.78em;
+            color: rgba(255,255,255,0.75);
+            margin-top: 4px;
+            font-weight: 300;
+            position: relative;
+        }
+        .header-nav {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+        .nav-link {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.25);
+            color: #fff;
+            padding: 8px 14px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-size: 0.8em;
+            font-weight: 500;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .nav-link:hover { background: rgba(255,255,255,0.25); }
+
+        /* ====== MAIN CARD ====== */
+        .main-container { max-width: 520px; margin: -40px auto 0; padding: 0 16px; }
+
+        .card {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        }
+
+        /* ====== TABS ====== */
+        .tab-group {
+            display: flex;
+            background: var(--surface);
+            border-radius: var(--radius-sm);
+            padding: 4px;
+            margin-bottom: 24px;
+            gap: 4px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 0.85em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.25s;
+            font-family: 'Noto Sans JP', sans-serif;
+        }
+        .tab-btn.active {
+            background: var(--grad);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(99,102,241,0.35);
+        }
+        .tab-btn:not(.active):hover { background: var(--surface-hover); color: var(--text); }
+
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .result-item { margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background-color: #fdfdfd; font-size: 0.9em; }
-        
-        /* カメラ・フォルダ選択ボタンのスタイル */
-        .action-buttons { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
-        .btn-camera { background-color: #28a745; margin: 0; padding: 12px 5px; width: 50%; font-size: 0.95em; }
-        .btn-gallery { background-color: #17a2b8; margin: 0; padding: 12px 5px; width: 50%; font-size: 0.95em; }
-        .btn-camera:hover { background-color: #218838; }
-        .btn-gallery:hover { background-color: #138496; }
+
+        /* ====== DROP ZONE ====== */
+        #dropZone {
+            border: 2px dashed rgba(99,102,241,0.4);
+            border-radius: var(--radius);
+            padding: 28px 20px;
+            text-align: center;
+            background: var(--grad-soft);
+            margin-bottom: 20px;
+            transition: all 0.25s;
+            cursor: pointer;
+        }
+        #dropZone.dragover {
+            border-color: var(--accent1);
+            background: rgba(99,102,241,0.2);
+            transform: scale(1.01);
+        }
+        .dropzone-icon { font-size: 2.4em; margin-bottom: 8px; }
+        .dropzone-title { font-size: 0.95em; font-weight: 500; margin-bottom: 4px; }
+        .dropzone-sub { font-size: 0.75em; color: var(--text-muted); margin-bottom: 16px; }
+
+        .action-buttons { display: flex; gap: 10px; }
+        .btn-camera, .btn-gallery {
+            flex: 1;
+            padding: 11px 8px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 0.85em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Noto Sans JP', sans-serif;
+        }
+        .btn-camera {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+        }
+        .btn-gallery {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+        }
+        .btn-camera:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .btn-gallery:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+        #fileName {
+            margin-top: 14px;
+            font-size: 0.82em;
+            font-weight: 500;
+            color: var(--accent2);
+            min-height: 20px;
+        }
+
+        /* ====== FORM ELEMENTS ====== */
+        label {
+            display: block;
+            font-size: 0.78em;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            letter-spacing: 0.03em;
+        }
+        textarea, input[type="text"], input[type="date"], input[type="number"], select {
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            padding: 12px 14px;
+            font-size: 0.9em;
+            font-family: 'Noto Sans JP', sans-serif;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            margin-bottom: 16px;
+            resize: vertical;
+        }
+        textarea:focus, input:focus, select:focus {
+            border-color: var(--accent1);
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.2);
+        }
+        select option { background: var(--bg2); }
+
+        /* ====== SUBMIT BUTTON ====== */
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: var(--radius-sm);
+            background: var(--grad);
+            color: #fff;
+            font-size: 0.95em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.25s;
+            font-family: 'Noto Sans JP', sans-serif;
+            box-shadow: 0 6px 20px rgba(99,102,241,0.4);
+            letter-spacing: 0.03em;
+        }
+        .btn-submit:hover { filter: brightness(1.1); transform: translateY(-2px); box-shadow: 0 10px 28px rgba(99,102,241,0.5); }
+        .btn-submit:disabled { opacity: 0.6; transform: none; cursor: not-allowed; }
+
+        /* ====== RESULT ITEMS ====== */
+        #resultArea { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .result-item {
+            padding: 14px 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--surface);
+            font-size: 0.85em;
+            line-height: 1.7;
+            transition: all 0.3s;
+            animation: fadeIn 0.3s ease;
+        }
+        .result-item.success { border-color: rgba(16,185,129,0.4); background: rgba(16,185,129,0.08); }
+        .result-item.error   { border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.08); }
+        .result-success { color: var(--success); font-weight: 600; }
+        .result-error   { color: var(--danger); font-weight: 500; }
+
+        @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+
+        /* ====== SPINNER ====== */
+        .spinner {
+            display: inline-block;
+            width: 14px; height: 14px;
+            border: 2px solid rgba(99,102,241,0.3);
+            border-top-color: var(--accent1);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ====== FOOTER ====== */
+        .page-footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 0.72em;
+            color: var(--text-muted);
+        }
     </style>
 </head>
 <body>
-    <a href="/summary.html" style="display:block; text-align:center; margin-bottom: 20px; background:#28a745; color:#fff; padding:12px; text-decoration:none; border-radius:5px; font-weight:bold;">📊 集計結果・履歴を見る</a>
-    
-    <h2>支出の登録</h2>
-    <div>
-        <button id="tabImage" class="tab-btn active">📷 レシート画像で登録</button>
-        <button id="tabText" class="tab-btn">✍️ 文字入力で登録</button>
-    </div>
+    <header class="app-header">
+        <nav class="header-nav">
+            <a href="/summary.html" class="nav-link">📊 集計・履歴</a>
+        </nav>
+        <h1>💳 ふたりの家計簿</h1>
+        <p class="subtitle">AI があなたのレシートを自動解析します</p>
+    </header>
 
-    <form id="uploadForm" class="tab-content active">
-        <div id="dropZone">
-            <p style="margin-top: 0; margin-bottom: 5px; font-weight: bold;">レシートの登録方法</p>
-            <p style="margin-top: 0; font-size: 0.85em; color: #666;">（PCの場合はここにドラッグ＆ドロップも可能）</p>
-            
-            <div class="action-buttons">
-                <button type="button" class="btn-camera" id="btnCamera">📷 カメラで撮る</button>
-                <button type="button" class="btn-gallery" id="btnGallery">🖼️ フォルダから</button>
+    <main class="main-container">
+        <div class="card">
+            <!-- タブ切替 -->
+            <div class="tab-group" role="tablist">
+                <button id="tabImage" class="tab-btn active" role="tab" aria-selected="true">📷 レシート画像</button>
+                <button id="tabText"  class="tab-btn"        role="tab" aria-selected="false">✍️ テキスト入力</button>
             </div>
-            
-            <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;">
-            <input type="file" id="galleryInput" accept="image/*" multiple style="display:none;">
-            
-            <div id="fileName" style="margin-top:15px; font-size:1em; font-weight:bold; color:#007bff;"></div>
+
+            <!-- 画像タブ -->
+            <form id="uploadForm" class="tab-content active">
+                <div id="dropZone" role="button" aria-label="画像をドロップ">
+                    <div class="dropzone-icon">🧾</div>
+                    <p class="dropzone-title">レシートを追加</p>
+                    <p class="dropzone-sub">PCの場合はここにドラッグ＆ドロップも可</p>
+                    <div class="action-buttons">
+                        <button type="button" class="btn-camera" id="btnCamera">📷 カメラで撮る</button>
+                        <button type="button" class="btn-gallery" id="btnGallery">🖼️ フォルダから選ぶ</button>
+                    </div>
+                    <div id="fileName"></div>
+                </div>
+
+                <input type="file" id="cameraInput"  accept="image/*" capture="environment" style="display:none;">
+                <input type="file" id="galleryInput" accept="image/*" multiple            style="display:none;">
+
+                <label for="commentInputImage">共通コメント（支払った人・負担割合など）</label>
+                <textarea id="commentInputImage" rows="3" placeholder="例: 妻が支払い。食費は折半、化粧品は妻負担。"></textarea>
+
+                <button type="submit" id="submitBtn" class="btn-submit">✨ AIで一括解析して登録</button>
+            </form>
+
+            <!-- テキストタブ -->
+            <form id="textForm" class="tab-content">
+                <label for="textInput">支出の内容を自由に入力してください</label>
+                <textarea id="textInput" rows="5" placeholder="例: 昨日スーパーで食料品を 3,000円 夫が支払い。全額夫負担。"></textarea>
+                <button type="submit" class="btn-submit">✨ AIで解析して登録</button>
+            </form>
+
+            <div id="resultArea"></div>
         </div>
 
-        <label>共通コメント (例: 全て妻が支払い。食費は折半、化粧品は妻負担):</label>
-        <textarea id="commentInputImage" rows="3" placeholder="支払った人や負担割合を入力してください"></textarea>
-        <button type="submit" id="submitBtn">AIで一括解析して登録</button>
-    </form>
-
-    <form id="textForm" class="tab-content">
-        <label>支出の内容を自由に入力してください:</label>
-        <textarea id="textInput" rows="4" placeholder="例: 昨日、スーパーで食料品を3000円夫が支払い。全額夫負担。"></textarea>
-        <button type="submit">AIで文字解析して登録</button>
-    </form>
-    
-    <div id="resultArea" style="margin-top: 15px;"></div>
+        <p class="page-footer">© ふたりの家計簿 — Powered by Cloudflare Workers &amp; Gemini AI</p>
+    </main>
 
     <script>
-        document.getElementById('tabImage').addEventListener('click', () => {
-            document.getElementById('tabImage').classList.add('active'); document.getElementById('tabText').classList.remove('active');
-            document.getElementById('uploadForm').classList.add('active'); document.getElementById('textForm').classList.remove('active');
-        });
-        document.getElementById('tabText').addEventListener('click', () => {
-            document.getElementById('tabText').classList.add('active'); document.getElementById('tabImage').classList.remove('active');
-            document.getElementById('textForm').classList.add('active'); document.getElementById('uploadForm').classList.remove('active');
+        // -------- Tab --------
+        const tabs = [
+            { btn: 'tabImage', form: 'uploadForm' },
+            { btn: 'tabText',  form: 'textForm'   }
+        ];
+        tabs.forEach(({ btn, form }) => {
+            document.getElementById(btn).addEventListener('click', () => {
+                tabs.forEach(t => {
+                    document.getElementById(t.btn).classList.toggle('active', t.btn === btn);
+                    document.getElementById(t.form).classList.toggle('active', t.form === form);
+                });
+            });
         });
 
-        const dropZone = document.getElementById('dropZone'); 
-        const cameraInput = document.getElementById('cameraInput'); 
-        const galleryInput = document.getElementById('galleryInput'); 
+        // -------- File handling --------
+        const dropZone        = document.getElementById('dropZone');
+        const cameraInput     = document.getElementById('cameraInput');
+        const galleryInput    = document.getElementById('galleryInput');
         const fileNameDisplay = document.getElementById('fileName');
+        let currentSelectedFiles = [];
 
-        // ボタンが押されたら裏側のファイル入力をクリックする
         document.getElementById('btnCamera').addEventListener('click', () => cameraInput.click());
         document.getElementById('btnGallery').addEventListener('click', () => galleryInput.click());
 
-        let currentSelectedFiles = []; // 現在選ばれているファイルを保持
-
         function updateFileDisplay(files) {
             currentSelectedFiles = files;
-            if (files.length === 0) {
-                fileNameDisplay.textContent = "";
-            } else if (files.length === 1) {
-                fileNameDisplay.textContent = `選択中: ${files[0].name}`;
-            } else {
-                fileNameDisplay.textContent = `選択中: ${files.length}枚のレシート画像`;
-            }
+            if (!files.length) { fileNameDisplay.textContent = ''; return; }
+            fileNameDisplay.textContent = files.length === 1
+                ? `✅ 選択中: ${files[0].name}`
+                : `✅ ${files.length}枚のレシート画像を選択中`;
         }
 
-        // カメラで撮影された時
-        cameraInput.addEventListener('change', () => {
-            if(cameraInput.files.length > 0) {
-                galleryInput.value = ''; // フォルダ側をリセット
-                updateFileDisplay(cameraInput.files);
-            }
+        cameraInput.addEventListener('change', () => { if (cameraInput.files.length)  { galleryInput.value = ''; updateFileDisplay(cameraInput.files); } });
+        galleryInput.addEventListener('change', () => { if (galleryInput.files.length) { cameraInput.value  = ''; updateFileDisplay(galleryInput.files); } });
+
+        dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault(); dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) { galleryInput.files = e.dataTransfer.files; cameraInput.value = ''; updateFileDisplay(galleryInput.files); }
         });
 
-        // フォルダから選ばれた時
-        galleryInput.addEventListener('change', () => {
-            if(galleryInput.files.length > 0) {
-                cameraInput.value = ''; // カメラ側をリセット
-                updateFileDisplay(galleryInput.files);
-            }
-        });
-
-        // PCからのドラッグ&ドロップ対応
-        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-        dropZone.addEventListener('drop', (e) => { 
-            e.preventDefault(); dropZone.classList.remove('dragover'); 
-            if (e.dataTransfer.files.length > 0) { 
-                galleryInput.files = e.dataTransfer.files; 
-                cameraInput.value = '';
-                updateFileDisplay(galleryInput.files);
-            } 
-        });
-
-        const todayStr = new Date().toLocaleDateString('ja-JP');
+        // -------- AI Prompt --------
+        const todayStr  = new Date().toLocaleDateString('ja-JP');
         const basePrompt = `本日は ${todayStr} です。以下の情報を解析し、指定されたJSONフォーマットで出力してください。JSON以外のテキストは絶対に含めないでください。
 ルール:
 1. "date" は、レシートに印字されている日付、または入力内容から推測される決済日を "YYYY-MM-DD" 形式で出力。
@@ -132,106 +374,91 @@
 フォーマット:
 { "date": "YYYY-MM-DD", "description": "購入した主な品目や店舗名", "total_amount": 合計金額(数値), "payer": "夫 または 妻", "husband_burden": 夫の負担額(数値), "wife_burden": 妻の負担額(数値), "genre": "選んだジャンル" }`;
 
+        // -------- processAI --------
         async function processAI(contentsArray, statusDiv, originalFile = null) {
+            const label = originalFile ? originalFile.name : 'テキスト入力';
             try {
-                statusDiv.innerHTML = `<strong>${originalFile ? originalFile.name : 'テキスト入力'}</strong><br>⏳ AI解析の準備中...`;
-                
-                const configRes = await fetch('/api/config');
+                statusDiv.innerHTML = `<span class="spinner"></span><strong>${label}</strong> — AI解析の準備中...`;
+
+                const configRes  = await fetch('/api/config');
                 const configText = await configRes.text();
                 let configData;
-                try {
-                    configData = JSON.parse(configText);
-                } catch (e) {
-                    throw new Error(`/api/config から予期せぬ応答が返りました: ${configText.substring(0, 100)}`);
-                }
-                if (!configData.apiKey) throw new Error("GEMINI_API_KEY が設定されていません。Cloudflareの環境変数をご確認ください。");
+                try { configData = JSON.parse(configText); }
+                catch { throw new Error(`/api/config から予期せぬ応答: ${configText.substring(0, 80)}`); }
+                if (!configData.apiKey) throw new Error('GEMINI_API_KEY が未設定です。Cloudflare 環境変数をご確認ください。');
 
-                statusDiv.innerHTML = `<strong>${originalFile ? originalFile.name : 'テキスト入力'}</strong><br>🧠 Geminiが解析中...`;
-                
+                statusDiv.innerHTML = `<span class="spinner"></span><strong>${label}</strong> — Gemini AI が解析中...`;
+
                 const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${configData.apiKey}`;
-                const geminiRes = await fetch(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: contentsArray }] }) });
+                const geminiRes  = await fetch(geminiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: contentsArray }] }) });
                 const geminiText = await geminiRes.text();
                 let geminiData;
-                try {
-                    geminiData = JSON.parse(geminiText);
-                } catch(e) {
-                    throw new Error(`Gemini API から予期せぬ応答が返りました: ${geminiText.substring(0, 100)}`);
-                }
+                try { geminiData = JSON.parse(geminiText); }
+                catch { throw new Error(`Gemini API から予期せぬ応答: ${geminiText.substring(0, 80)}`); }
 
                 if (!geminiRes.ok) {
-                    if(geminiData.error?.code === 429) throw new Error('APIの制限回数を超えました。少し待ってから再度お試しください。');
-                    throw new Error(`Googleエラー: ${geminiData.error?.message || '詳細不明'}`);
-                }
-                
-                let rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                let cleanedJsonText = rawText.replace(/```json\s*|```/g, '').trim();
-                let parsedData;
-                try {
-                    parsedData = JSON.parse(cleanedJsonText);
-                } catch(e) {
-                    throw new Error(`Gemini の解析結果 JSON パースに失敗しました: ${rawText.substring(0, 100)}`);
+                    if (geminiData.error?.code === 429) throw new Error('API 制限に達しました。しばらく待ってから再試行してください。');
+                    throw new Error(`Google API エラー: ${geminiData.error?.message || '詳細不明'}`);
                 }
 
-                statusDiv.innerHTML = `<strong>${originalFile ? originalFile.name : 'テキスト入力'}</strong><br>💾 データを保存中...`;
-                
+                const rawText       = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                const cleanedJson   = rawText.replace(/```json\s*|```/g, '').trim();
+                let parsedData;
+                try { parsedData = JSON.parse(cleanedJson); }
+                catch { throw new Error(`JSON パース失敗: ${rawText.substring(0, 80)}`); }
+
+                statusDiv.innerHTML = `<span class="spinner"></span><strong>${label}</strong> — データを保存中...`;
+
                 const formData = new FormData();
                 formData.append('data', JSON.stringify(parsedData));
                 if (originalFile) formData.append('image', originalFile);
 
-                const saveRes = await fetch('/api/upload', { method: 'POST', body: formData });
+                const saveRes  = await fetch('/api/upload', { method: 'POST', body: formData });
                 const saveText = await saveRes.text();
                 let saveData;
-                try {
-                    saveData = JSON.parse(saveText);
-                } catch(e) {
-                    throw new Error(`/api/upload 保存エラー: ${saveText.substring(0, 150)}`);
+                try { saveData = JSON.parse(saveText); }
+                catch { throw new Error(`保存エラー: ${saveText.substring(0, 120)}`); }
+
+                if (saveData.success) {
+                    statusDiv.classList.add('success');
+                    statusDiv.innerHTML = `<span class="result-success">✅ 登録完了</span><br><strong>${label}</strong><br>📅 ${saveData.data.date} &nbsp;|&nbsp; 🏷️ ${saveData.data.genre} &nbsp;|&nbsp; 📝 ${saveData.data.description}<br>💴 合計 <strong>${Number(saveData.data.total_amount).toLocaleString()}円</strong>`;
+                } else {
+                    throw new Error(saveData.error);
                 }
-                
-                if(saveData.success) {
-                    statusDiv.innerHTML = `<strong>${originalFile ? originalFile.name : 'テキスト入力'}</strong><br><span style="color:green;">✅ 登録完了!</span><br>決済日: ${saveData.data.date} / 内容: [${saveData.data.genre}] ${saveData.data.description} / 合計: ${saveData.data.total_amount}円`;
-                    statusDiv.style.backgroundColor = "#e8f5e9";
-                    statusDiv.style.borderColor = "#c8e6c9";
-                } else { 
-                    throw new Error(saveData.error); 
-                }
-            } catch (err) { 
-                console.error("AI Process Error:", err);
-                statusDiv.innerHTML = `<strong>${originalFile ? originalFile.name : 'テキスト入力'}</strong><br><span style="color:red;">❌ エラーが発生しました: ${err.message}</span>`; 
-                statusDiv.style.backgroundColor = "#ffebee";
-                statusDiv.style.borderColor = "#ffcdd2";
+            } catch (err) {
+                console.error('AI Process Error:', err);
+                statusDiv.classList.add('error');
+                statusDiv.innerHTML = `<span class="result-error">❌ エラー</span><br><strong>${label}</strong><br>${err.message}`;
             }
         }
 
-        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-            e.preventDefault(); 
-            const files = currentSelectedFiles; // 統合されたファイル配列を使用
-            
-            if (files.length === 0) { alert("カメラで撮影するか、画像を選択してください"); return; }
-            if (files.length > 5) { alert("一度に処理できるのは最大5枚までです。\nお手数ですが5枚以下に分けて登録してください。"); return; }
+        // -------- Upload Form Submit --------
+        document.getElementById('uploadForm').addEventListener('submit', async e => {
+            e.preventDefault();
+            const files = currentSelectedFiles;
+            if (!files.length)   { alert('カメラで撮影するか、画像を選択してください'); return; }
+            if (files.length > 5){ alert('一度に処理できるのは最大5枚です。'); return; }
 
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
-            submitBtn.textContent = "処理中...";
+            submitBtn.textContent = '⏳ 処理中...';
 
             const resultArea = document.getElementById('resultArea');
-            resultArea.innerHTML = "";
-
+            resultArea.innerHTML = '';
             const comment = document.getElementById('commentInputImage').value;
 
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
+            for (const file of files) {
                 const statusDiv = document.createElement('div');
-                statusDiv.className = "result-item";
-                statusDiv.innerHTML = `<strong>${file.name}</strong><br>順番待ち...`;
+                statusDiv.className = 'result-item';
+                statusDiv.innerHTML = `<strong>${file.name}</strong> — 順番待ち...`;
                 resultArea.appendChild(statusDiv);
 
                 const prompt = basePrompt + `\n\n【ユーザー共通コメント】: "${comment}"\n【画像】: 添付のレシート`;
-                
-                await new Promise((resolve) => {
+                await new Promise(resolve => {
                     const reader = new FileReader();
-                    reader.onload = async (e) => {
-                        const base64Image = e.target.result.split(',')[1];
-                        await processAI([{ text: prompt }, { inline_data: { mime_type: file.type, data: base64Image } }], statusDiv, file);
+                    reader.onload = async ev => {
+                        const base64 = ev.target.result.split(',')[1];
+                        await processAI([{ text: prompt }, { inline_data: { mime_type: file.type, data: base64 } }], statusDiv, file);
                         resolve();
                     };
                     reader.readAsDataURL(file);
@@ -239,21 +466,22 @@
             }
 
             document.getElementById('uploadForm').reset();
-            currentSelectedFiles = []; // 選択状況をリセット
-            fileNameDisplay.textContent = "全ての処理が完了しました！";
+            currentSelectedFiles = [];
+            fileNameDisplay.textContent = '✅ 全ての処理が完了しました！';
             submitBtn.disabled = false;
-            submitBtn.textContent = "AIで一括解析して登録";
+            submitBtn.textContent = '✨ AIで一括解析して登録';
         });
 
-        document.getElementById('textForm').addEventListener('submit', async (e) => {
-            e.preventDefault(); 
-            const text = document.getElementById('textInput').value; 
-            if (!text) { alert("支出の内容を入力してください"); return; }
+        // -------- Text Form Submit --------
+        document.getElementById('textForm').addEventListener('submit', async e => {
+            e.preventDefault();
+            const text = document.getElementById('textInput').value;
+            if (!text) { alert('支出の内容を入力してください'); return; }
 
             const resultArea = document.getElementById('resultArea');
-            resultArea.innerHTML = "";
+            resultArea.innerHTML = '';
             const statusDiv = document.createElement('div');
-            statusDiv.className = "result-item";
+            statusDiv.className = 'result-item';
             resultArea.appendChild(statusDiv);
 
             await processAI([{ text: basePrompt + `\n\n【入力内容】: "${text}"` }], statusDiv);
